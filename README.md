@@ -8,7 +8,7 @@ This code reads satellites from a list of TLEs and propagates them in orbit arou
 
 In approximately decreasing priority,
 
-1. Implement distance more efficient nearest-neighbour search.
+1. Implement distance more efficient nearest-neighbour search - SciPy KDTree should be O(n log n) instead of O(n^2).
 2. Implement numba (JIT compilation) and parallelize
 3. Rewrite all I/O with list comprehensions (or array comprehensions if it helps significantly)
 4. Re-evaluate performance and decide if it needs to be translated
