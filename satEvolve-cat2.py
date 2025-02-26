@@ -11,6 +11,7 @@ import matplotlib.pylab as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import sgp4.api as sgp4
+import scipy.spatial as sp
 
 # Select TLE Catalogue
 # Also set epoch information for TLEs
