@@ -8,10 +8,13 @@ This code reads satellites from a list of TLEs and propagates them in orbit arou
 
 In approximately decreasing priority,
 
-1. Implement distance more efficient nearest-neighbour search - SciPy KDTree should be O(n log n) instead of O(n^2).
-2. Implement numba (JIT compilation) and parallelize
-3. Rewrite all I/O with list comprehensions (or array comprehensions if it helps significantly)
+1. ~~Implement distance more efficient nearest-neighbour search - SciPy KDTree should be O(n log n) instead of O(n^2).~~
+2. Vectorize KeplerTools
+3. Implement numba (JIT compilation) and (probably) parallelize
 4. Re-evaluate performance and decide if it needs to be translated
+5. Rewrite all I/O with list comprehensions (or array comprehensions if it helps significantly)
+6. Remove plotting and create a helper program to take care of it afterwards for deployment
 
-The code is almost entirely in "raw" Python right now using lists. SciPy and numpy should contain a significant portion of these operations
-as precompiled nicely vectorized C/Fortran code; should save the headache of doing a full translation. The following might be useful:
+## Other Notes:
+
+- Nothing rn :3
