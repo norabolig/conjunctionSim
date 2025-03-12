@@ -32,7 +32,7 @@ REkm = 6378.135
 ECCSCALE=0.0002 # make eccentric enough to fill shells for any artificial systems
 SMASCALE=1000 # km to metres
 DT=0.05 # time step in seconds
-NTIME=18000 # number of steps
+NTIME=50 # number of steps
 DCLOSE_METRE=10000 # track if closer than this
 P_THRESH=2000e3 + REarth # do not include objects with pericentres above this
 
