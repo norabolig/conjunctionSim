@@ -28,8 +28,8 @@ EPOCHLIM = 24280
 # Constants and parameters
 ECCSCALE=0.0002         # make eccentric enough to fill shells for any artificial systems
 SMASCALE=1000           # km to metres
-DT=0.05                 # time step in seconds
-NTIME=50                # number of steps
+DT=0.1                 # time step in seconds
+NTIME=54000               # number of steps
 
 twopi=np.pi*2
 MEarth = 5.97e24            # Mass of Earth (kg)
@@ -62,7 +62,7 @@ woh = open(PHASE_FOUT,"w")
 while tles_fh:
     calculate=0
     line=tles_fh.readline()
-    print(line.rstrip(),len(line))
+    # print(line.rstrip(),len(line))
     if len(line)<1: break
     if line[0]=="0":
        id,junk,sname=line.rstrip().partition(" ")
@@ -84,10 +84,10 @@ while tles_fh:
         v=np.array([v_km[0],v_km[1],v_km[2]])*SMASCALE
         r=np.array([r_km[0],r_km[1],r_km[2]])*SMASCALE
 
-        print(r)
+        # print(r)
 
         a,ecc,omega,inc,Omega,nu = KT.getORBELM(r,v,muE)
-        print(a,ecc,omega,inc,Omega,nu)
+        # print(a,ecc,omega,inc,Omega,nu)
 
         if a*(1-ecc) < P_THRESH: 
 
@@ -175,12 +175,12 @@ for itime in range(NTIME):
     for i in range(len(pairs)):
         i1, i2 = pairs[i][0], pairs[i][1] # Pull out both indices
 
-        d = np.linalg.norm(satPos[i1] - satPos[i2]) # Distance
-        v = np.linalg.norm(satVel[i2] - satVel[i2]) # Velocity
+        relD = np.linalg.norm(satPos[i1] - satPos[i2]) # Distance
+        relV = np.linalg.norm(satVel[i2] - satVel[i2]) # Velocity
 
         plot_time.append(simtime)
-        plot_dist.append(d)
-        plot_vel.append(v)
+        plot_dist.append(relD)
+        plot_vel.append(relV)
 
         plot_range.append(rsphere[i1] - REarth) # Altitudes
         plot_range.append(rsphere[i2] - REarth)
