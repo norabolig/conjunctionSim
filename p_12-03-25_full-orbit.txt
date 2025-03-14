@@ -1,4 +1,4 @@
-Test run for 90 minutes of runtime, approximately one full orbit for most LEO sats.
+Test run for 90 minutes of runtime, approximately one full orbit for most LEOs
 
 CPU
 

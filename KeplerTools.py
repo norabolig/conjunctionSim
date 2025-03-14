@@ -81,12 +81,12 @@ def get_Qs(w,O,inc):
     cosO, sinO = np.cos(O), np.sin(O)
     cosI, sinI = np.cos(inc), np.sin(inc)
 
-    Q[0][0] = cosW*cosO - sinW*sinO*cosI
-    Q[0][1] =-sinW*cosO - cosW*sinO*cosI
-    Q[1][0] = cosW*sinO + sinW*cosO*cosI 
-    Q[1][1] =-sinW*sinO + cosW*cosO*cosI
-    Q[2][0] = sinW*sinI
-    Q[2][1] = cosW*sinI
+    Q[0,0] = cosW*cosO - sinW*sinO*cosI
+    Q[0,1] =-sinW*cosO - cosW*sinO*cosI
+    Q[1,0] = cosW*sinO + sinW*cosO*cosI 
+    Q[1,1] =-sinW*sinO + cosW*cosO*cosI
+    Q[2,0] = sinW*sinI
+    Q[2,1] = cosW*sinI
 
     return Q
 

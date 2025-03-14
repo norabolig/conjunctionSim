@@ -28,8 +28,8 @@ EPOCHLIM = 24280
 # Constants and parameters
 ECCSCALE=0.0002         # make eccentric enough to fill shells for any artificial systems
 SMASCALE=1000           # km to metres
-DT=0.1                 # time step in seconds
-NTIME=54000               # number of steps
+DT=0.05                 # time step in seconds
+NTIME=50               # number of steps
 
 twopi=np.pi*2
 MEarth = 5.97e24            # Mass of Earth (kg)
@@ -60,34 +60,26 @@ tles_fh = open(TLES_FILENAME,"r")
 woh = open(PHASE_FOUT,"w")
 
 while tles_fh:
-    calculate=0
     line=tles_fh.readline()
     # print(line.rstrip(),len(line))
-    if len(line)<1: break
-    if line[0]=="0":
-       id,junk,sname=line.rstrip().partition(" ")
-    elif line[0]=="1":
-       s=line.rstrip()
-    elif line[0]=="2":
-       t=line.rstrip()
-       calculate=1
-#    else:
-#       except(typeError): print("Warning -- TLE LINE ID NOT FOUND")
 
-    if calculate==1:
+    if len(line)<1: break
+    if line[0]=="0": id, junk, sname = line.rstrip().partition(" ")
+    elif line[0]=="1": s = line.rstrip()
+    elif line[0]=="2":
+        t = line.rstrip()
         satellite = sgp4.Satrec.twoline2rv(s, t)
         jd_last = satellite.jdsatepoch
+
         if jd_last < JD - JDOFFSET: 
               print("ISSUE WITH JDs: WANTING {} GOT {}".format(JD,jd_last))
               continue 
+        
         err,r_km,v_km = satellite.sgp4(JD, FR)
         v=np.array([v_km[0],v_km[1],v_km[2]])*SMASCALE
         r=np.array([r_km[0],r_km[1],r_km[2]])*SMASCALE
 
-        # print(r)
-
         a,ecc,omega,inc,Omega,nu = KT.getORBELM(r,v,muE)
-        # print(a,ecc,omega,inc,Omega,nu)
 
         if a*(1-ecc) < P_THRESH: 
 
@@ -101,7 +93,10 @@ while tles_fh:
             MA = EA - ecc*np.sin(EA)
             sat_ma.append(MA)
             woh.write("{},{},{},{},{},{},{}\n".format(sname,r_km[0],r_km[1],r_km[2],v_km[0],v_km[1],v_km[2]))
+#    else:
+#       except(typeError): print("Warning -- TLE LINE ID NOT FOUND")
 
+tles_fh.close()
 woh.close() 
 
 sat_a=np.array(sat_a)

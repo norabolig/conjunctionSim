@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pylab as plt
 from scipy.optimize import curve_fit
 
-fh=open("track_out.dat","r")
+fh=open("./out/track_out.dat","r")
 
 CLOSE=10000
 DTMAX=0.05
@@ -78,7 +78,7 @@ while True:
 
 plt.xlabel("Time in minutes")
 plt.ylabel("Conjunction Distance [m]")
-plt.savefig("close_approach_tracks.pdf")
+plt.savefig("/out/close_approach_tracks_fit.pdf")
 
 print(vclose)
 print(dclose)
