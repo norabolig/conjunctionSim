@@ -78,7 +78,7 @@ while True:
 
 plt.xlabel("Time in minutes")
 plt.ylabel("Conjunction Distance [m]")
-plt.savefig("/out/close_approach_tracks_fit.pdf")
+plt.savefig("./out/close_approach_tracks_fit.pdf")
 
 print(vclose)
 print(dclose)

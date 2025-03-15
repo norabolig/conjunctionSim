@@ -13,6 +13,7 @@ In approximately decreasing priority,
 > Partially done
 3. Implement numba (JIT compilation) and (probably) parallelize
 > Also partially done, only in KT right now, will need to reorganize program structure to parallelize better
+4. Extend SatEvol to examine phase-space mixing.
 4. Re-evaluate performance and decide if it needs to be translated
 5. Rewrite all I/O with list comprehensions (or array comprehensions if it helps significantly)
 6. Remove plotting and create a helper program to take care of it afterwards for deployment

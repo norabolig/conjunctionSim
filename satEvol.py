@@ -29,7 +29,7 @@ EPOCHLIM = 24280
 ECCSCALE=0.0002         # make eccentric enough to fill shells for any artificial systems
 SMASCALE=1000           # km to metres
 DT=0.05                 # time step in seconds
-NTIME=50               # number of steps
+NTIME=432000               # number of steps
 
 twopi=np.pi*2
 MEarth = 5.97e24            # Mass of Earth (kg)
@@ -54,7 +54,6 @@ sat_Omega=[]    # Angular velocity
 sat_e=[]        # Eccentricity
 sat_I=[]        # Inclination
 
-
 # read tle file, open log file
 tles_fh = open(TLES_FILENAME,"r")
 woh = open(PHASE_FOUT,"w")
@@ -64,8 +63,10 @@ while tles_fh:
     # print(line.rstrip(),len(line))
 
     if len(line)<1: break
-    if line[0]=="0": id, junk, sname = line.rstrip().partition(" ")
-    elif line[0]=="1": s = line.rstrip()
+    if line[0]=="0": 
+        id, junk, sname = line.rstrip().partition(" ")
+    elif line[0]=="1": 
+        s = line.rstrip()
     elif line[0]=="2":
         t = line.rstrip()
         satellite = sgp4.Satrec.twoline2rv(s, t)
@@ -133,8 +134,9 @@ plot_name2=[]
 plot_vel=[]
 
 # begin main integration
+print('Beginning main integration...')
 for itime in range(NTIME):
-    print("TIME {}".format(simtime))
+    # print("TIME {}".format(simtime))
    
     # advance mean anomaly one step
     sat_ma=sat_ma+sat_n*DT
@@ -148,7 +150,7 @@ for itime in range(NTIME):
 
     # NOTE: Get rid of this loop once you vectorize KeplerTools
     for i in range(NSAT):
-        x0,y0,z0,vx0,vy0,vz0 = KT.getXYZVVV(sat_ma[i],sat_a[i],sat_omega[i],sat_e[i],sat_Omega[i],sat_I[i],m0=MEarth,m1=0.)
+        x0,y0,z0,vx0,vy0,vz0 = KT.getXYZVVV(sat_ma[i], sat_a[i], sat_omega[i], sat_e[i], sat_Omega[i], sat_I[i], m0=MEarth, m1=0.)
         x[i]=x0
         y[i]=y0
         z[i]=z0
@@ -243,7 +245,7 @@ ax.add_feature(cfeature.BORDERS)
 ax.gridlines()
 
 poly = ax.scatter(phiSat,thetaSat,s=0.2,transform=ccrs.PlateCarree(),c='blue',alpha=1.00)
-plt.title("Simulated Satellites Projected onto Earth",fontsize=20)
+plt.title("Simulated Satellites Projected onto Earth", fontsize=20)
 plt.savefig("./out/sats_65k_mollweide_lineonly.pdf")
 
 

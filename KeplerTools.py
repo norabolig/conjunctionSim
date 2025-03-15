@@ -8,9 +8,10 @@
 #
 
 import numpy as np
-from numba import njit, prange
+from numba import njit
 
 twopi=np.pi*2.0
+MEarth = 5.97e24
 
 @njit
 def vrad(f,n,a,ecc): return n*a*ecc*np.sin(f)/np.sqrt(1-ecc**2)
@@ -34,25 +35,31 @@ def kepEq(MA,ecc,EA=0,tol=1e-4):
   MA = MA/(twopi)
   MA = (MA-np.floor(MA))*twopi      # ensures between 0 and 2 pi
   A = kepResid(ecc,EA,MA)
-  iter=0
-  EA=MA*1
-  if ecc>0.8: EA=np.pi*1
-  while np.abs(A)>tol:
+  EA=MA
+
+  if ecc > 0.8: EA = np.pi
+
+  i = 0
+  while np.abs(A) > tol and i <= 1000:
       EA = MA + ecc*np.sin(EA)
       A = kepResid(ecc,EA,MA)
-      iter+=1
-      if iter > 1000:
-         print("Convergence issue for MA {} ecc {} EA {} and iter {}".format(MA,ecc,EA,iter))
-         iter=0
+      i += 1
+
+  if i > 1000:
+      print("Convergence issue for MA {} ecc {} EA {} and iter {}".format(MA,ecc,EA,iter))
+      i = 0
+
   return EA
 
 @njit
 def kepEqHyper(MA,ecc,EA=0,tol=1e-6):
   A = kepResidHyper(ecc,EA,MA)
-  while np.abs(A)>tol:
+  
+  while np.abs(A) > tol:
       dAdE = -1 + ecc * np.cosh(EA)
       EA = EA - A/dAdE
       A = kepResidHyper(ecc,EA,MA)
+
   return EA
 
 @njit
@@ -111,7 +118,7 @@ def get_dQOs(w0,O,inc):
     return Q
 
 @njit
-def getXYZVVV(nu,a,w0,ecc,O,inc,m0,m1,G=6.6743e-11):
+def getXYZVVV(nu, a, w0, ecc, O, inc, m0 = MEarth, m1 = 0., G=6.6743e-11):
     n = np.sqrt(G*(m0+m1)/a**3)
     r = radial(nu,a,ecc)
     Q = get_Qs(w0,O,inc)
@@ -143,34 +150,32 @@ def getORBELM(r_vec,v_vec,mu):
     v = np.linalg.norm(v_vec)
     vr = np.dot(v_vec, r_vec)/r
 
-    vperp = np.sqrt(v**2-vr**2)
+    vperp = np.sqrt(v**2 - vr**2)
 
     h_vec = np.cross(r_vec,v_vec)
-    h = np.sqrt(h_vec[0]**2 + h_vec[1]**2 + h_vec[2]**2)
+    h = np.linalg.norm(h_vec)
 
     inc = np.arccos(h_vec[2]/h)
 
     N_vec = np.cross(np.array([0,0,1]),h_vec)
-    N = np.sqrt(N_vec[0]**2 + N_vec[1]**2 + N_vec[2]**2)
+    N = np.linalg.norm(N_vec)
+
     Omega = np.arccos(N_vec[0]/N)
-    if N_vec[1]<0: Omega=2*np.pi-Omega
+    if N_vec[1] < 0: Omega = 2*np.pi - Omega
 
     ecc_vec = np.cross(v_vec,h_vec)/mu - r_vec/r
-    ecc = np.sqrt(ecc_vec[0]**2 + ecc_vec[1]**2 + ecc_vec[2]**2)
+    ecc = np.linalg.norm(ecc_vec)
 
-    product = 0.
-    for i in range(3): product += ecc_vec[i]*N_vec[i]
+    omega = np.arccos(np.dot(ecc_vec,N_vec)/(ecc*N))
+    if ecc_vec[2] < 0: omega = 2*np.pi - omega
 
-    omega = np.arccos(dotProduct(ecc_vec,N_vec)/(ecc*N))
-    if ecc_vec[2] < 0: omega=2*np.pi-omega
+    TA = np.arccos(np.dot(ecc_vec,r_vec)/(ecc*r))
 
-    TA = np.arccos(dotProduct(ecc_vec,r_vec)/(ecc*r))
-
-    if vr < 0: TA = 2*np.pi-TA
+    if vr < 0: TA = 2*np.pi - TA
 
     a = 1./(2./r - v*v/mu)
 
-    return a,ecc,omega,inc,Omega,TA
+    return a, ecc, omega, inc, Omega, TA
 
 
 
