@@ -18,7 +18,14 @@ In approximately decreasing priority,
 5. Rewrite all I/O with list comprehensions (or array comprehensions if it helps significantly)
 6. Remove plotting and create a helper program to take care of it afterwards for deployment
 
+## Plots and Quantities Needed:
+
+1. Phase-space mixing histogram for starlink constellation. Sampled ~hourly. 2D histogram?
+2. Time scale for close encounters as a function of altitude.
+3. (Maybe) Object threshold for avoidance maneuver cascade
+
 ## Changelog:
 
 - 11/03/25: Implemented KDTree distance search
 - 12/03/25: Optimized a chunk of KeplerTools, implemented numba for jit compilation.
+- 17/03/25: Minor file I/O clean-up, including outfiles for 4-orbit test run.
