@@ -16,38 +16,45 @@ from scipy.spatial import KDTree
 
 # Select TLE Catalogue
 # Also set epoch information for TLEs
-#TLES_FILENAME="starlink_07OCT2024.tles"
-TLES_FILENAME="./in/starlink_deb.tles"
-PHASE_FOUT="./out/catdata_xyzvxvyvz.dat"
-JD=2460591.5
-FR=0.0
-JDOFFSET=100
+# TLES_FILENAME = "./in/starlink_07OCT2024.tles"
+TLES_FILENAME = "./in/starlink_deb.tles"
+PHASE_FOUT = "./out/catdata_xyzvxvyvz.dat"
+OUT_SUFFIX = '_allSat_48hr'
+JD = 2460591.5
+FR = 0.0
+JDOFFSET = 100
 EPOCHLIM = 24280
 
-
 # Constants and parameters
-ECCSCALE=0.0002         # make eccentric enough to fill shells for any artificial systems
-SMASCALE=1000           # km to metres
-DT=0.05                 # time step in seconds
-NTIME=432000               # number of steps
+ECCSCALE = 0.0002         # Make eccentric enough to fill shells for any artificial systems
+SMASCALE = 1000           # km to metres
+DT = 0.05                 # Time step in seconds
+TTIME = 172800           # How long to run sim (s)
+NTIME = int(TTIME / DT)   # Number of steps
 
-twopi=np.pi*2
+EXAMINE_PHS = False                   # Flag to determine if we examine phase-space mixing and produce histograms
+PHS_INT_S = 3600                      # How many seconds to wait between calculating phase-space coords,
+PHS_INT = int(PHS_INT_S / DT)        # and how many time steps.
+PHS_FRAMES = int(NTIME / PHS_INT)    # How many frames of our phase space plot we'll have.
+
+PLOT = True     # If we want to create the plots directly in satEvol
+
+twopi = np.pi*2             # How many pi??
 MEarth = 5.97e24            # Mass of Earth (kg)
 REarth = 6378.135e3         # Radius of Earth (m)
 REkm = REarth/SMASCALE      # Radius of Earth (km)
 
-DCLOSE_METRE = 10000        # track if closer than this
+DCLOSE_METRE = 15000        # track if closer than this
 P_THRESH = 2000e3 + REarth  # do not include objects with pericentres above this
 
-
-aukm=1.496e8            # Astronomical unit (km)
-au=aukm*SMASCALE        # Astronomical unit (m)
-G=6.6743e-11            # Big G (SI)
-J2=1082.64e-6           # ?
-muE = 3.986004418e14    # ?
+aukm = 1.496e8            # Astronomical unit (km)
+au = aukm*SMASCALE        # Astronomical unit (m)
+G = 6.6743e-11            # Big G (SI)
+J2 = 1082.64e-6           # Arcane kinematic parameters
+muE = 3.986004418e14
 
 sat_sname=[]    # Satellite name
-sat_a=[]        # True anomaly?
+sat_a=[]        # Semi-major axis
 sat_ma=[]       # Mean anomaly
 sat_omega=[]    # Angle between something I need to figure out
 sat_Omega=[]    # Angular velocity
@@ -123,30 +130,31 @@ vx=np.zeros(NSAT)
 vy=np.zeros(NSAT)
 vz=np.zeros(NSAT)
 
-simtime=0.
-plot_time=[]
-plot_dist=[]
-plot_range=[]
-plot_id1=[]
-plot_id2=[]
-plot_name1=[]
-plot_name2=[]
-plot_vel=[]
+simtime = 0.
+plot_time = []
+plot_dist = []
+plot_range = []
+plot_id1 = []
+plot_id2 = []
+plot_name1 = []
+plot_name2 = []
+plot_vel = []
+
+hist_dist = []      # List of arrays of nearest neighbour distances
+hist_vel = []       # List of arrays of nearest neighbour relative velocities
 
 # begin main integration
-print('Beginning main integration...')
+print('Beginning main integration... \nTotal time: {}s'.format(TTIME))
 for itime in range(NTIME):
-    # print("TIME {}".format(simtime))
-   
     # advance mean anomaly one step
-    sat_ma=sat_ma+sat_n*DT
-    flag = sat_ma>twopi
-    sat_ma[flag]-=twopi
+    sat_ma = sat_ma + sat_n*DT
+    flag = sat_ma > twopi
+    sat_ma[flag] -= twopi
 
     # advance node one step
     sat_Omega = sat_Omega + Omega_dot*DT
     flag = sat_Omega > twopi
-    sat_Omega[flag]-=twopi
+    sat_Omega[flag] -= twopi
 
     # NOTE: Get rid of this loop once you vectorize KeplerTools
     for i in range(NSAT):
@@ -165,96 +173,139 @@ for itime in range(NTIME):
     # Assemble a KDTree of satellite positions to query for satellites within the distance threshold
     satPos = np.column_stack((x, y, z)) # Array where the ith element contains the 3d coordinates of the ith satellite
     satVel = np.column_stack((vx, vy, vz))
-    satPosTree = KDTree(satPos)
-    pairs = satPosTree.query_pairs(DCLOSE_METRE, output_type='ndarray') # Array of pairs of indices for satellites below the distance threshold
-    
-    # Loop over that array to pull out information from the corresponding satellites
-    for i in range(len(pairs)):
-        i1, i2 = pairs[i][0], pairs[i][1] # Pull out both indices
 
-        relD = np.linalg.norm(satPos[i1] - satPos[i2]) # Distance
-        relV = np.linalg.norm(satVel[i2] - satVel[i2]) # Velocity
+    # If we want to examine phase-space mixing, calculate the nearest neighbour distance and relative velocity of every satellite every PHASE_INT
+    # time steps, otherwise keep track of close approach tracks under DCLOSE_METRE.
+    if EXAMINE_PHS and itime % PHS_INT == 0:
+        satPosTree = KDTree(satPos) # Only construct this on time-steps we have to
+        NNd, NNi = satPosTree.query(satPos, k=2, workers=4)
+        relD, relV = np.zeros(NSAT), np.zeros(NSAT)
 
-        plot_time.append(simtime)
-        plot_dist.append(relD)
-        plot_vel.append(relV)
+        for i in range(len(NNi)):
+            i1, i2 = NNi[i][0], NNi[i][1]
 
-        plot_range.append(rsphere[i1] - REarth) # Altitudes
-        plot_range.append(rsphere[i2] - REarth)
+            relD[i] = np.linalg.norm(satPos[i1] - satPos[i2])
+            relV[i] = np.linalg.norm(satVel[i1] - satVel[i2])
 
-        plot_id1.append(i1)
-        plot_id2.append(i2)
-        plot_name1.append(sat_sname[i1])
-        plot_name2.append(sat_sname[i2])
+        hist_dist.append(relD)
+        hist_vel.append(relV)
+    else:
+        satPosTree = KDTree(satPos)
+        pairs = satPosTree.query_pairs(DCLOSE_METRE, output_type='ndarray') # Array of pairs of indices for satellites below the distance threshold
+        closeN = len(pairs)
+
+        # Loop over that array to pull out information from the corresponding satellites
+        for i in range(len(pairs)):
+            i1, i2 = pairs[i, 0], pairs[i, 1] # Pull out both indices
+
+            relD = np.linalg.norm(satPos[i1] - satPos[i2]) # Distance
+            relV = np.linalg.norm(satVel[i1] - satVel[i2]) # Velocity
+
+            plot_time.append(simtime)
+            plot_dist.append(relD)
+            plot_vel.append(relV)
+
+            plot_range.append(rsphere[i1] - REarth) # Altitudes
+            plot_range.append(rsphere[i2] - REarth)
+
+            plot_id1.append(i1)
+            plot_id2.append(i2)
+            plot_name1.append(sat_sname[i1])
+            plot_name2.append(sat_sname[i2])
+
+    print("Time: {time}s \t Satellites within close-approach distance: {n}".format(time = str(simtime)[0:7], n = closeN), end='\r')
 
     simtime+=DT
 
 plot_time=np.array(plot_time)
 plot_dist=np.array(plot_dist)
 
-plt.figure()
-plt.scatter(plot_time/60,plot_dist/1000,s=1)
-plt.title("Close approach tracks")
-plt.ylabel("Close Approach Distance [km]")
-plt.xlabel("Time (minutes)")
-plt.savefig("./out/close_approach_tracks.pdf")
+hist_dist = np.array(hist_dist)
+hist_vel = np.array(hist_vel)
 
-fh=open("./out/track_out.dat","w")
-for i in range(len(plot_time)):
-    fh.write("{},{},{},{},{},{},{},{}\n".format(plot_time[i],plot_dist[i],plot_vel[i],plot_range[i],plot_id1[i],plot_id2[i],plot_name1[i],plot_name2[i]))
-fh.close()
+print('\nWriting outfile/Plotting...')
 
-phiSat=phiSat*180/np.pi
-thetaSat=90-thetaSat*180/np.pi
+if EXAMINE_PHS and PLOT:
+    # for iFrame in range(PHS_FRAMES):
+    #     fig, ax = plt.subplots(1, 1, figsize=(10,10))
 
-flag = phiSat>180
-phiSat[flag]=phiSat[flag]-360
+    #     ax.hist2d(hist_dist[iFrame], hist_vel[iFrame], bins = 100)
+    #     plt.savefig('./out/phs_hist/hist_frame_%s.png' % (iFrame), format='png', dpi=300, facecolor='white')
 
-fig=plt.figure(figsize=[15,8])
-#ax=fig.add_subplot(1,1,1, projection=ccrs.Robinson())
-ax=fig.add_subplot(1,1,1, projection=ccrs.Mollweide())
-#ax.set_global()
-ax.stock_img()
-ax.coastlines()
-ax.add_feature(cfeature.BORDERS)
-ax.gridlines()
+    for iFrame in range(PHS_FRAMES):
+        fig, (axD, axV) = plt.subplots(1, 2, figsize=(20,10))
 
-poly = ax.scatter(phiSat,thetaSat,s=0.1,transform=ccrs.PlateCarree(),c='black',alpha=0.75)
-plt.title("Simulated Satellites Projected onto Earth")
-plt.savefig("./out/sats_mollweide.pdf")
+        axD.hist(hist_dist[iFrame]/SMASCALE, bins=50, range=[0, 800])
+        axV.hist(hist_vel[iFrame]/SMASCALE, bins=50, range=[0, 25])
 
+        axD.set_xlabel('Nearest Neighbour Distance [km]')
+        axV.set_xlabel('Nearest Neighbour Relative Velocity [km/s]')
 
-fig=plt.figure(figsize=[15,8])
-ax=fig.add_subplot(1,1,1, projection=ccrs.Mollweide())
-ax.gridlines()
+        axD.set_ylim(0, 800)
+        axV.set_ylim(0, 2000)
 
+        axD.set_ylabel('Frequency')
 
-poly = ax.scatter((-phiSat),thetaSat,s=0.2,transform=ccrs.PlateCarree(),c='black')
-plt.title("Simulated Satellites on CS")
-plt.savefig("./out/sats_mollweide_CS.pdf")
+        plt.savefig('./out/phs_hist/hist_frame_%s.png' % (iFrame), format='png', dpi=300, facecolor='white')
+        plt.close()
 
+else:
+    fh=open("./out/track_out.dat","w")
+    for i in range(len(plot_time)):
+        fh.write("{},{},{},{},{},{},{},{}\n".format(plot_time[i],plot_dist[i],plot_vel[i],plot_range[i],plot_id1[i],plot_id2[i],plot_name1[i],plot_name2[i]))
+    fh.close()
 
+    phiSat=phiSat*180/np.pi
+    thetaSat=90-thetaSat*180/np.pi
 
-fig=plt.figure(figsize=[15,8])
-#ax=fig.add_subplot(1,1,1, projection=ccrs.Robinson())
-ax=fig.add_subplot(1,1,1, projection=ccrs.Mollweide())
-#ax.set_global()
-#ax.stock_img()
-ax.coastlines()
-ax.add_feature(cfeature.BORDERS)
-ax.gridlines()
+    flag = phiSat>180
+    phiSat[flag]=phiSat[flag]-360
 
-poly = ax.scatter(phiSat,thetaSat,s=0.2,transform=ccrs.PlateCarree(),c='blue',alpha=1.00)
-plt.title("Simulated Satellites Projected onto Earth", fontsize=20)
-plt.savefig("./out/sats_65k_mollweide_lineonly.pdf")
+    if PLOT:
 
+        plt.figure()
+        plt.scatter(plot_time/60,plot_dist/1000,s=1)
+        plt.title("Close approach tracks")
+        plt.ylabel("Close Approach Distance [km]")
+        plt.xlabel("Time (minutes)")
+        plt.savefig("./out/close_approach_tracks" + OUT_SUFFIX + ".pdf")
 
+        fig=plt.figure(figsize=[15,8])
+        #ax=fig.add_subplot(1,1,1, projection=ccrs.Robinson())
+        ax=fig.add_subplot(1,1,1, projection=ccrs.Mollweide())
+        #ax.set_global()
+        ax.stock_img()
+        ax.coastlines()
+        ax.add_feature(cfeature.BORDERS)
+        ax.gridlines()
 
-
-
-plt.show()
-
-
-
+        poly = ax.scatter(phiSat,thetaSat,s=0.1,transform=ccrs.PlateCarree(),c='black',alpha=0.75)
+        plt.title("Simulated Satellites Projected onto Earth")
+        plt.savefig("./out/sats_mollweide" + OUT_SUFFIX + ".pdf")
 
 
+        fig=plt.figure(figsize=[15,8])
+        ax=fig.add_subplot(1,1,1, projection=ccrs.Mollweide())
+        ax.gridlines()
+
+
+        poly = ax.scatter((-phiSat),thetaSat,s=0.2,transform=ccrs.PlateCarree(),c='black')
+        plt.title("Simulated Satellites on CS")
+        plt.savefig("./out/sats_mollweide_CS" + OUT_SUFFIX + ".pdf")
+
+
+
+        fig=plt.figure(figsize=[15,8])
+        #ax=fig.add_subplot(1,1,1, projection=ccrs.Robinson())
+        ax=fig.add_subplot(1,1,1, projection=ccrs.Mollweide())
+        #ax.set_global()
+        #ax.stock_img()
+        ax.coastlines()
+        ax.add_feature(cfeature.BORDERS)
+        ax.gridlines()
+
+        poly = ax.scatter(phiSat,thetaSat,s=0.2,transform=ccrs.PlateCarree(),c='blue',alpha=1.00)
+        plt.title("Simulated Satellites Projected onto Earth", fontsize=20)
+        plt.savefig("./out/sats_65k_mollweide_lineonly" + OUT_SUFFIX + ".pdf")
+
+print('Done!')
