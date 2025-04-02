@@ -7,16 +7,23 @@ This code reads satellites from a list of TLEs and propagates them in orbit arou
 
 There are a handful of parameters at the beginning of `satEvol.py` to be configured:
 
+
 `TLES_FILENAME [str]`:    Path to file containing list of TLEs to be read in
+
 `PHASE_FOUT [str]`:       Name for outfile containing initial phase-space configuration (i.e. positions and velocities for every satellite at t=0)
+
 `OUT_SUFFIX [str]`:       String appended to all outfiles for a given run
 
 `EXAMINE_PHS [bool]`:     Whether or not examine phase-space mixing with snapshots
+
 `PLOT [bool]`:            Wether or not to create plots directly with satEvol.  
 
 `DT [float]`:             Length of time-step [s]
+
 `TTIME [float]`:          Total time of sim run [s]
+
 `PHS_INT_S [float]`:      How long to wait between phase-space snapshots if `EXAMINE_PHS=True`
+
 `DCLOSE_METRE [float]`:   Minimum distance to catalogue a close encounter [m]
 
 Once configured, the code can be run with
