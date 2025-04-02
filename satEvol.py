@@ -18,8 +18,8 @@ from scipy.spatial import KDTree
 # Also set epoch information for TLEs
 # TLES_FILENAME = "./in/starlink_07OCT2024.tles"
 TLES_FILENAME = "./in/starlink_deb.tles"
-PHASE_FOUT = "./out/catdata_xyzvxvyvz.dat"
 OUT_SUFFIX = '_allSat_48hr'
+PHASE_FOUT = "./out/catdata_xyzvxvyvz" + OUT_SUFFIX +".dat"
 JD = 2460591.5
 FR = 0.0
 JDOFFSET = 100
@@ -143,6 +143,8 @@ plot_vel = []
 hist_dist = []      # List of arrays of nearest neighbour distances
 hist_vel = []       # List of arrays of nearest neighbour relative velocities
 
+fh=open("./out/track_out" + OUT_SUFFIX +".dat", "w")
+
 # begin main integration
 print('Beginning main integration... \nTotal time: {}s'.format(TTIME))
 for itime in range(NTIME):
@@ -201,18 +203,22 @@ for itime in range(NTIME):
             relD = np.linalg.norm(satPos[i1] - satPos[i2]) # Distance
             relV = np.linalg.norm(satVel[i1] - satVel[i2]) # Velocity
 
+            alt = rsphere[i1] - REarth
+
             plot_time.append(simtime)
             plot_dist.append(relD)
             plot_vel.append(relV)
 
-            plot_range.append(rsphere[i1] - REarth) # Altitudes
-            plot_range.append(rsphere[i2] - REarth)
+            plot_range.append(alt) # Altitudes
 
             plot_id1.append(i1)
             plot_id2.append(i2)
             plot_name1.append(sat_sname[i1])
             plot_name2.append(sat_sname[i2])
 
+            # Write outfile at every time step in case something crashes
+            fh.write("{},{},{},{},{},{},{},{}\n".format(simtime, relD, relV, alt, i1, i2, sat_sname[i1], sat_sname[i2]))
+    
     print("Time: {time}s \t Satellites within close-approach distance: {n}".format(time = str(simtime)[0:7], n = closeN), end='\r')
 
     simtime+=DT
@@ -222,6 +228,8 @@ plot_dist=np.array(plot_dist)
 
 hist_dist = np.array(hist_dist)
 hist_vel = np.array(hist_vel)
+
+fh.close()
 
 print('\nWriting outfile/Plotting...')
 
@@ -250,11 +258,6 @@ if EXAMINE_PHS and PLOT:
         plt.close()
 
 else:
-    fh=open("./out/track_out.dat","w")
-    for i in range(len(plot_time)):
-        fh.write("{},{},{},{},{},{},{},{}\n".format(plot_time[i],plot_dist[i],plot_vel[i],plot_range[i],plot_id1[i],plot_id2[i],plot_name1[i],plot_name2[i]))
-    fh.close()
-
     phiSat=phiSat*180/np.pi
     thetaSat=90-thetaSat*180/np.pi
 
