@@ -18,7 +18,7 @@ from scipy.spatial import KDTree
 # Also set epoch information for TLEs
 # TLES_FILENAME = "./in/starlink_07OCT2024.tles"
 TLES_FILENAME = "./in/starlink_deb.tles"
-OUT_SUFFIX = '_allSat_48hr'
+OUT_SUFFIX = '_test'
 PHASE_FOUT = "./out/catdata_xyzvxvyvz" + OUT_SUFFIX +".dat"
 JD = 2460591.5
 FR = 0.0
@@ -29,13 +29,15 @@ EPOCHLIM = 24280
 ECCSCALE = 0.0002         # Make eccentric enough to fill shells for any artificial systems
 SMASCALE = 1000           # km to metres
 DT = 0.05                 # Time step in seconds
-TTIME = 172800           # How long to run sim (s)
+TTIME = 30           # How long to run sim (s)
 NTIME = int(TTIME / DT)   # Number of steps
 
 EXAMINE_PHS = False                   # Flag to determine if we examine phase-space mixing and produce histograms
 PHS_INT_S = 3600                      # How many seconds to wait between calculating phase-space coords,
 PHS_INT = int(PHS_INT_S / DT)        # and how many time steps.
 PHS_FRAMES = int(NTIME / PHS_INT)    # How many frames of our phase space plot we'll have.
+
+DCLOSE_METRE = 15000        # track if closer than this
 
 PLOT = True     # If we want to create the plots directly in satEvol
 
@@ -44,7 +46,6 @@ MEarth = 5.97e24            # Mass of Earth (kg)
 REarth = 6378.135e3         # Radius of Earth (m)
 REkm = REarth/SMASCALE      # Radius of Earth (km)
 
-DCLOSE_METRE = 15000        # track if closer than this
 P_THRESH = 2000e3 + REarth  # do not include objects with pericentres above this
 
 aukm = 1.496e8            # Astronomical unit (km)
@@ -53,6 +54,9 @@ G = 6.6743e-11            # Big G (SI)
 J2 = 1082.64e-6           # Arcane kinematic parameters
 muE = 3.986004418e14
 
+# Nerd stuff
+F_CHUNK = int(5e4)   # How many time steps we wait between dumping to outfile
+
 sat_sname=[]    # Satellite name
 sat_a=[]        # Semi-major axis
 sat_ma=[]       # Mean anomaly
@@ -60,6 +64,12 @@ sat_omega=[]    # Angle between something I need to figure out
 sat_Omega=[]    # Angular velocity
 sat_e=[]        # Eccentricity
 sat_I=[]        # Inclination
+
+# Helper functions
+def writeOutfile(prop: dict, type='close-approach') -> None:
+    for i in range(len(prop['t'])):
+        fh.write("{},{},{},{},{},{},{},{}\n".format(prop['t'][i], prop['dist'][i], prop['vel'][i], 
+                                                    prop['alt'][i], prop['id1'][i], prop['id2'][i], prop['name1'][i], prop['name2'][i]))
 
 # read tle file, open log file
 tles_fh = open(TLES_FILENAME,"r")
@@ -131,14 +141,17 @@ vy=np.zeros(NSAT)
 vz=np.zeros(NSAT)
 
 simtime = 0.
-plot_time = []
-plot_dist = []
-plot_range = []
-plot_id1 = []
-plot_id2 = []
-plot_name1 = []
-plot_name2 = []
-plot_vel = []
+
+plotProp = {
+    't':     [],
+    'dist':  [],
+    'vel':   [],
+    'alt':   [],
+    'id1':   [],
+    'id2':   [],
+    'name1': [],
+    'name2': []
+}
 
 hist_dist = []      # List of arrays of nearest neighbour distances
 hist_vel = []       # List of arrays of nearest neighbour relative velocities
@@ -205,33 +218,35 @@ for itime in range(NTIME):
 
             alt = rsphere[i1] - REarth
 
-            plot_time.append(simtime)
-            plot_dist.append(relD)
-            plot_vel.append(relV)
+            plotProp['t'].append(simtime)
+            plotProp['dist'].append(relD)
+            plotProp['vel'].append(relV)
 
-            plot_range.append(alt) # Altitudes
+            plotProp['alt'].append(alt) # Altitudes
 
-            plot_id1.append(i1)
-            plot_id2.append(i2)
-            plot_name1.append(sat_sname[i1])
-            plot_name2.append(sat_sname[i2])
+            plotProp['id1'].append(i1)
+            plotProp['id2'].append(i2)
+            plotProp['name1'].append(sat_sname[i1])
+            plotProp['name2'].append(sat_sname[i2])
 
-            # Write outfile at every time step in case something crashes
-            fh.write("{},{},{},{},{},{},{},{}\n".format(simtime, relD, relV, alt, i1, i2, sat_sname[i1], sat_sname[i2]))
+        if itime % F_CHUNK == 0:   
+            writeOutfile(plotProp)
+
+            for k, v in plotProp.items():
+                plotProp[k].clear() # Reset the lists to clear space
     
     print("Time: {time}s \t Satellites within close-approach distance: {n}".format(time = str(simtime)[0:7], n = closeN), end='\r')
 
     simtime+=DT
 
-plot_time=np.array(plot_time)
-plot_dist=np.array(plot_dist)
-
 hist_dist = np.array(hist_dist)
 hist_vel = np.array(hist_vel)
 
-fh.close()
-
 print('\nWriting outfile/Plotting...')
+
+writeOutfile(plotProp)  # Write one last time to catch the last time-steps
+
+fh.close()
 
 if EXAMINE_PHS and PLOT:
     # for iFrame in range(PHS_FRAMES):
@@ -265,9 +280,8 @@ else:
     phiSat[flag]=phiSat[flag]-360
 
     if PLOT:
-
         plt.figure()
-        plt.scatter(plot_time/60,plot_dist/1000,s=1)
+        plt.scatter(np.array(plotProp['t'])/60,np.array(plotProp['dist'])/1000,s=1)
         plt.title("Close approach tracks")
         plt.ylabel("Close Approach Distance [km]")
         plt.xlabel("Time (minutes)")

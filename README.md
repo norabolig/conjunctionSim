@@ -68,4 +68,5 @@ In approximately decreasing priority,
 - 12/03/25: Optimized a chunk of KeplerTools, implemented numba for jit compilation.
 - 17/03/25: Minor file I/O clean-up, including outfiles for 4-orbit test run.
 - 23/03/25: Implemented phase-space mixing. Fixed bug in outfiles.
-- 26/03/25: Including outfiles for 48 hour test run, dt = 0.05s w/ 15km threshold.
+- 26/03/25: Performed 48 hour test run, dt = 0.05s w/ 15km threshold.
+- 02/04/25: Cleaned up some memory management.
