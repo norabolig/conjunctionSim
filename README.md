@@ -1,7 +1,7 @@
 # SatEvol
 ## Satellite Cloud Evolution and Close Approach Tracking
 
-This code reads satellites from a list of TLEs and propagates them in orbit around the Earth using the SGP4 model. At each time-step all satellites are checked for close approaches with other satellites and logged.
+This code reads satellite TLEs and propagates those objects on orbit around the Earth using the SGP4 model to a common epoch. At each time-step all satellites are checked for close approaches with other satellites and logged.
 
 ## How to run:
 
