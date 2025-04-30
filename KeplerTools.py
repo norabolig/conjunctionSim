@@ -8,6 +8,8 @@
 #
 
 import numpy as np
+import numba as nb
+
 from numba import njit
 
 twopi=np.pi*2.0
@@ -75,70 +77,78 @@ def trueAnom(ecc,EA):
   return f
 
 @njit
+def meanAnom(ecc,TA):
+   EA = EAnom(ecc, TA)
+   return EA - ecc*np.sin(EA)
+
+@njit
 def trueAnomHyper(ecc,EA): 
   f=2*np.arctan(np.sqrt( (ecc+1)/(ecc-1) ) * np.tanh(EA/2.) )
   if f<0: f+=twopi
   return f
 
-@njit
-def get_Qs(w,O,inc):
-    Q=np.zeros((3,2))
+@njit(nb.float64[:, :, :](nb.float64[:], nb.float64[:], nb.float64[:]))
+def get_Qs(w, O, inc) -> np.ndarray:
+    
+    Qs = np.zeros((len(w), 3, 2))
 
     cosW, sinW = np.cos(w), np.sin(w)
     cosO, sinO = np.cos(O), np.sin(O)
     cosI, sinI = np.cos(inc), np.sin(inc)
 
-    Q[0,0] = cosW*cosO - sinW*sinO*cosI
-    Q[0,1] =-sinW*cosO - cosW*sinO*cosI
-    Q[1,0] = cosW*sinO + sinW*cosO*cosI 
-    Q[1,1] =-sinW*sinO + cosW*cosO*cosI
-    Q[2,0] = sinW*sinI
-    Q[2,1] = cosW*sinI
+    Qs[:, 0, 0] = cosW*cosO - sinW*sinO*cosI
+    Qs[:, 0, 1] =-sinW*cosO - cosW*sinO*cosI
+    Qs[:, 1, 0] = cosW*sinO + sinW*cosO*cosI 
+    Qs[:, 1, 1] =-sinW*sinO + cosW*cosO*cosI
+    Qs[:, 2, 0] = sinW*sinI
+    Qs[:, 2, 1] = cosW*sinI
 
-    return Q
+    # print(Qs)
+
+    return Qs
+
+# @njit
+# def get_dQs(w0,O,inc):
+#     Q=np.zeros((3,2))
+#     Q[1][0] =-np.sin(w0)*np.cos(O)*np.sin(inc) 
+#     Q[1][1] = -np.cos(w0)*np.cos(O)*np.sin(inc)
+#     Q[2][0] = np.sin(w0)*np.cos(inc)
+#     Q[2][1] = np.cos(w0)*np.cos(inc)
+#     return Q
+
+# @njit
+# def get_dQOs(w0,O,inc):
+#     Q=np.zeros((3,2))
+#     Q[0][0]=-np.cos(w0)*np.sin(O)-np.sin(w0)*np.cos(O)*np.cos(inc)
+#     Q[0][1]=+np.sin(w0)*np.sin(O)-np.cos(w0)*np.cos(O)*np.cos(inc)
+#     Q[1][0] =np.cos(w0)*np.cos(O)-np.sin(w0)*np.sin(O)*np.cos(inc) 
+#     Q[1][1] = -np.sin(w0)*np.cos(O)-np.cos(w0)*np.sin(O)*np.cos(inc)
+#     Q[2][0] = 0.
+#     Q[2][1] = 0.
+#     return Q
 
 @njit
-def get_dQs(w0,O,inc):
-    Q=np.zeros((3,2))
-    Q[1][0] =-np.sin(w0)*np.cos(O)*np.sin(inc) 
-    Q[1][1] = -np.cos(w0)*np.cos(O)*np.sin(inc)
-    Q[2][0] = np.sin(w0)*np.cos(inc)
-    Q[2][1] = np.cos(w0)*np.cos(inc)
-    return Q
-
-@njit
-def get_dQOs(w0,O,inc):
-    Q=np.zeros((3,2))
-    Q[0][0]=-np.cos(w0)*np.sin(O)-np.sin(w0)*np.cos(O)*np.cos(inc)
-    Q[0][1]=+np.sin(w0)*np.sin(O)-np.cos(w0)*np.cos(O)*np.cos(inc)
-    Q[1][0] =np.cos(w0)*np.cos(O)-np.sin(w0)*np.sin(O)*np.cos(inc) 
-    Q[1][1] = -np.sin(w0)*np.cos(O)-np.cos(w0)*np.sin(O)*np.cos(inc)
-    Q[2][0] = 0.
-    Q[2][1] = 0.
-    return Q
-
-@njit
-def getXYZVVV(nu, a, w0, ecc, O, inc, m0 = MEarth, m1 = 0., G=6.6743e-11):
-    n = np.sqrt(G*(m0+m1)/a**3)
+def getXYZVVV(nu, a, w0, ecc, O, inc, n, m0=MEarth, m1=0., G=6.6743e-11):
     r = radial(nu,a,ecc)
     Q = get_Qs(w0,O,inc)
 
     cosNu, sinNu = np.cos(nu), np.sin(nu)
 
-    X=r*cosNu*Q[0][0]+r*sinNu*Q[0][1]
-    Y=r*cosNu*Q[1][0]+r*sinNu*Q[1][1]
-    Z=r*cosNu*Q[2][0]+r*sinNu*Q[2][1]
+    pos = np.column_stack((r*cosNu*Q[:, 0, 0]+r*sinNu*Q[:, 0, 1], 
+                    r*cosNu*Q[:, 1, 0]+r*sinNu*Q[:, 1, 1], 
+                    r*cosNu*Q[:, 2, 0]+r*sinNu*Q[:, 2, 1]))
 
     vr = vrad(nu,n,a,ecc)
     vf = vaz(nu,n,a,ecc)
+
     VXss=vr*cosNu-vf*sinNu
     VYss=vr*sinNu+vf*cosNu
 
-    VX=VXss*Q[0][0]+VYss*Q[0][1]
-    VY=VXss*Q[1][0]+VYss*Q[1][1]
-    VZ=VXss*Q[2][0]+VYss*Q[2][1]
+    vel = np.column_stack((VXss*Q[:, 0, 0]+VYss*Q[:, 0, 1],
+                    VXss*Q[:, 1, 0]+VYss*Q[:, 1, 1],
+                    VXss*Q[:, 2, 0]+VYss*Q[:, 2, 1]))
 
-    return X, Y, Z, VX, VY, VZ
+    return pos, vel
 
 @njit
 def dotProduct(x,y): return np.dot(x, y)

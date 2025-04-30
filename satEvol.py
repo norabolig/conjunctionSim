@@ -5,14 +5,19 @@
 
 ## Made even cooler by Skye Heiland. February 2025.
 
-import KeplerTools as KT
+# External dependencies
 import numpy as np
+import numba as nb
 import matplotlib.pylab as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import sgp4.api as sgp4
 
 from scipy.spatial import KDTree
+
+# Internal
+import KeplerTools as KT
+from satArr import satArray
 
 # Select TLE Catalogue
 # Also set epoch information for TLEs
@@ -29,7 +34,7 @@ EPOCHLIM = 24280
 ECCSCALE = 0.0002         # Make eccentric enough to fill shells for any artificial systems
 SMASCALE = 1000           # km to metres
 DT = 0.05                 # Time step in seconds
-TTIME = 30           # How long to run sim (s)
+TTIME = 600           # How long to run sim (s)
 NTIME = int(TTIME / DT)   # Number of steps
 
 EXAMINE_PHS = False                   # Flag to determine if we examine phase-space mixing and produce histograms
@@ -57,89 +62,106 @@ muE = 3.986004418e14
 # Nerd stuff
 F_CHUNK = int(5e4)   # How many time steps we wait between dumping to outfile
 
-sat_sname=[]    # Satellite name
-sat_a=[]        # Semi-major axis
-sat_ma=[]       # Mean anomaly
-sat_omega=[]    # Angle between something I need to figure out
-sat_Omega=[]    # Angular velocity
-sat_e=[]        # Eccentricity
-sat_I=[]        # Inclination
+# Helper I/O functions
+# Read infile of TLEs and return a structured array of satellites
+def readTLEs(path: str, phase_outfile: bool = False) -> np.array:
+    if phase_outfile: woh = open(PHASE_FOUT,"w")
 
-# Helper functions
+    with open(path,'r') as f:
+        lines = f.readlines()
+        NSat = int(len(lines)/3) # Total number of satellites, assuming three lines per
+
+        names = np.zeros(NSat, dtype='U10')
+        a = np.zeros(NSat, dtype='f8')
+        ma = np.zeros(NSat, dtype='f8')
+        omega = np.zeros(NSat, dtype='f8')
+        Omega = np.zeros(NSat, dtype='f8')
+        Omega_dot = np.zeros(NSat, dtype='f8')
+        n = np.zeros(NSat, dtype='f8')
+        ecc = np.zeros(NSat, dtype='f8')
+        inc = np.zeros(NSat, dtype='f8')
+
+        pos = np.zeros(NSat, dtype=('f8', 3))
+        vel = np.zeros(NSat, dtype=('f8', 3))
+
+        satIndex = 0
+        for i, line in enumerate(lines):
+            if len(line) < 1: break
+            if line[0] == '0':
+                id, junk, sname = line.rstrip().partition(' ')
+
+            elif line[0] == '1':
+                s = line.rstrip()
+
+            elif line[0] == '2':
+                t = line.rstrip()
+                sat = sgp4.Satrec.twoline2rv(s, t)
+
+                if sat.jdsatepoch < JD - JDOFFSET:
+                    print("ISSUE WITH JDs: WANTING {} GOT {}".format(JD, sat.jdsatepoch))
+                    continue
+
+                err, r_km, v_km = sat.sgp4(JD, FR)
+                v = np.array([v_km[0],v_km[1],v_km[2]])*SMASCALE
+                r = np.array([r_km[0],r_km[1],r_km[2]])*SMASCALE
+                sat_a, sat_ecc, sat_omega, sat_inc, sat_Omega, sat_nu = KT.getORBELM(r, v, muE)
+
+                sat_ma = KT.meanAnom(sat_ecc, sat_nu)  # Mean anomaly
+                sat_n = np.sqrt(G*MEarth/sat_a**3) # Inverse period
+                sat_Omega_dot = -1.5*(REarth)**2 / (sat_a*(1 - sat_ecc))**2 * J2 * sat_n * np.cos(sat_inc) # Precession rate
+
+                if sat_a*(1 - sat_ecc) < P_THRESH:
+                    names[satIndex] = sname
+                    a[satIndex] = sat_a
+                    ma[satIndex] = sat_ma
+                    omega[satIndex] = sat_omega
+                    Omega[satIndex] = sat_Omega
+                    Omega_dot[satIndex] = sat_Omega_dot
+                    n[satIndex] = sat_n
+                    ecc[satIndex] = sat_ecc
+                    inc[satIndex] = sat_inc
+
+                    if phase_outfile: woh.write("{},{},{},{},{},{},{}\n".format(sname, r_km[0], r_km[1], r_km[2], v_km[0], v_km[1], v_km[2]))
+                satIndex += 1
+
+    if phase_outfile: woh.close()
+    return names, a, ma, omega, Omega, Omega_dot, n, ecc, inc, pos, vel
+
 def writeOutfile(prop: dict, type='close-approach') -> None:
     for i in range(len(prop['t'])):
         fh.write("{},{},{},{},{},{},{},{}\n".format(prop['t'][i], prop['dist'][i], prop['vel'][i], 
                                                     prop['alt'][i], prop['id1'][i], prop['id2'][i], prop['name1'][i], prop['name2'][i]))
-
-# read tle file, open log file
-tles_fh = open(TLES_FILENAME,"r")
-woh = open(PHASE_FOUT,"w")
-
-while tles_fh:
-    line=tles_fh.readline()
-    # print(line.rstrip(),len(line))
-
-    if len(line)<1: break
-    if line[0]=="0": 
-        id, junk, sname = line.rstrip().partition(" ")
-    elif line[0]=="1": 
-        s = line.rstrip()
-    elif line[0]=="2":
-        t = line.rstrip()
-        satellite = sgp4.Satrec.twoline2rv(s, t)
-        jd_last = satellite.jdsatepoch
-
-        if jd_last < JD - JDOFFSET: 
-              print("ISSUE WITH JDs: WANTING {} GOT {}".format(JD,jd_last))
-              continue 
         
-        err,r_km,v_km = satellite.sgp4(JD, FR)
-        v=np.array([v_km[0],v_km[1],v_km[2]])*SMASCALE
-        r=np.array([r_km[0],r_km[1],r_km[2]])*SMASCALE
+# Distance searching function (can't be jitted because of SciPy)
+def threshQuery(satArr: satArray, d: float):
+    satPosTree = KDTree(satArr.pos)
+    return satPosTree.query_pairs(d, output_type='ndarray')
 
-        a,ecc,omega,inc,Omega,nu = KT.getORBELM(r,v,muE)
+# ================= MAIN BLOCK ================= #
 
-        if a*(1-ecc) < P_THRESH: 
+def main() -> None:
+    # Read in TLEs
+    satData = readTLEs(TLES_FILENAME, phase_outfile=True)
+    Satellites = satArray(satData[0], satData[1], satData[2], satData[3], satData[4], satData[5],
+                          satData[6], satData[7], satData[8], satData[9], satData[10])
 
-            sat_sname.append(sname)
-            sat_a.append(a)
-            sat_e.append(ecc)
-            sat_omega.append(omega)
-            sat_Omega.append(Omega)
-            sat_I.append(inc)
-            EA=KT.EAnom(ecc,nu)
-            MA = EA - ecc*np.sin(EA)
-            sat_ma.append(MA)
-            woh.write("{},{},{},{},{},{},{}\n".format(sname,r_km[0],r_km[1],r_km[2],v_km[0],v_km[1],v_km[2]))
-#    else:
-#       except(typeError): print("Warning -- TLE LINE ID NOT FOUND")
+    # Initialize satellite positions
+    Satellites.updateKinematics()
+    
+    # Main integration
+    for itime in range(NTIME):
+        Satellites.updateOrbit(DT)
+        Satellites.updateKinematics()
+        print(itime*DT)
 
-tles_fh.close()
-woh.close() 
+        closeIndices = threshQuery(Satellites, DCLOSE_METRE)
+        conjData = Satellites.getConjunctionData(closeIndices)
 
-sat_a=np.array(sat_a)
-sat_omega=np.array(sat_omega)
-sat_Omega=np.array(sat_Omega)
-sat_e=np.array(sat_e)
-sat_I=np.array(sat_I)
-sat_ma=np.array(sat_ma)
-NSAT=len(sat_a)
 
-sat_n = np.sqrt(G*MEarth/sat_a**3)
-
-# set precession rate
-Omega_dot = -1.5* (REarth)**2/(sat_a*(1-sat_e))**2*J2*sat_n*np.cos(sat_I)
-
-# sanity check
-print("Total sats: {}".format(NSAT))
-
-x=np.zeros(NSAT)
-y=np.zeros(NSAT)
-z=np.zeros(NSAT)
-vx=np.zeros(NSAT)
-vy=np.zeros(NSAT)
-vz=np.zeros(NSAT)
-
+if __name__ == '__main__':
+    main()
+    quit()
+        
 simtime = 0.
 
 plotProp = {
