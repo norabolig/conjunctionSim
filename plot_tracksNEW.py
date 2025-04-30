@@ -8,16 +8,18 @@ from matplotlib.colors import LogNorm
 CLOSE=1e3  # CHOOSE CLOSE APPROACH DISTANCE HERE
 DTMAX=0.05
 TMIN=0
-TMAX=40*60*60  # CHOOSE MAX TIME FOR PLOT HERE
+TMAX=5*60  # CHOOSE MAX TIME FOR PLOT HERE
 DTSEP=1000
 PLOTSTAR=False
+OUTPUTENCOUNTER=True  # CHOOSE IF YOU WANT TO SAVE ENCOUNTER DATA
 
-FILENAME = 'track_out_allSat_48hr.dat'  # PUT IN YOUR OUTPUT FILE HERE
+FILENAME = 'out/track_close_encounters_7day_10km.dat'  # PUT IN YOUR OUTPUT FILE HERE
+OUTPUTFILE = 'out/output_track_close_encounters_7day_10km.hdf'  # FOR IF YOU WANT TO SAVE ENCOUNTER DATA
 
 columns = ['time','dist','dv', 'alt', 'index1', 'index2', 'name1', 'name2']
 dat = pd.read_csv(FILENAME, delimiter=',', header=None)  # PUT IN YOUR OUTPUT FILE HERE
 dat.columns=columns
-subset = dat.loc[(dat.dist<CLOSE)&(dat.time>TMIN)&(dat.time<TMAX)]
+subset = dat.loc[(dat.dist>0)&(dat.dist<CLOSE)&(dat.time>TMIN)&(dat.time<TMAX)]
 
 time=np.array(subset.time)
 dist=np.array(subset.dist)
@@ -180,6 +182,11 @@ altclose = np.array(altclose)
 tclose = np.array(tclose)
 cclose = np.array(cclose)
 
+DF = pd.DataFrame(np.array([tclose,dclose,vclose,altclose,cclose]).T)
+DF.columns = ['time','dist','dV','alt','type']
+DF.to_hdf(OUTPUTFILE,key='data')
+
+
 custom_lines = [Line2D([0], [0], color='green', lw=4),
                 Line2D([0], [0], color='blue', lw=4),
                 Line2D([0], [0], color='red', lw=4),
@@ -286,7 +293,7 @@ altbins = np.arange(200,2000,1)
 h,bins = np.histogram(altclose/1e3,bins=altbins)
 binmids = (bins[:-1]+bins[1:])/2
 plt.plot(binmids,TMAX/(60*h))
-plt.xlim(400,1000)
+plt.xlim(200,2000)
 plt.axhline(TMAX/60,ls='--',label='max sim. time')
 plt.axhline(20,color='xkcd:red',ls='--',label='20 minutes')
 plt.yscale('log')
