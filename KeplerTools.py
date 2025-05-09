@@ -187,6 +187,13 @@ def getORBELM(r_vec,v_vec,mu):
 
     return a, ecc, omega, inc, Omega, TA
 
+@njit
+def getNorm(arr: np.ndarray) -> np.ndarray:
+  norms = np.zeros(len(arr))
+  for i in range(len(arr)):
+    norms[i] = np.sqrt(arr[i, 0]*arr[i, 0] + arr[i, 1]*arr[i, 1] + arr[i, 2]*arr[i, 2])
+  return norms
+
 
 
 

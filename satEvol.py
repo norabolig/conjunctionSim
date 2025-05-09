@@ -12,9 +12,9 @@ import matplotlib.pylab as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import sgp4.api as sgp4
+import csv
 
 from scipy.spatial import KDTree
-
 # Internal
 import KeplerTools as KT
 from satArr import satArray
@@ -22,9 +22,10 @@ from satArr import satArray
 # Select TLE Catalogue
 # Also set epoch information for TLEs
 # TLES_FILENAME = "./in/starlink_07OCT2024.tles"
-TLES_FILENAME = "./in/starlink_deb.tles"
+TLES_FILENAME = "./in/full_cat.tles"
 OUT_SUFFIX = '_test'
 PHASE_FOUT = "./out/catdata_xyzvxvyvz" + OUT_SUFFIX +".dat"
+OUTFILE = './out/track_out' + OUT_SUFFIX + '.dat'
 JD = 2460591.5
 FR = 0.0
 JDOFFSET = 100
@@ -34,7 +35,7 @@ EPOCHLIM = 24280
 ECCSCALE = 0.0002         # Make eccentric enough to fill shells for any artificial systems
 SMASCALE = 1000           # km to metres
 DT = 0.05                 # Time step in seconds
-TTIME = 600           # How long to run sim (s)
+TTIME = 60           # How long to run sim (s)
 NTIME = int(TTIME / DT)   # Number of steps
 
 EXAMINE_PHS = False                   # Flag to determine if we examine phase-space mixing and produce histograms
@@ -42,7 +43,8 @@ PHS_INT_S = 3600                      # How many seconds to wait between calcula
 PHS_INT = int(PHS_INT_S / DT)        # and how many time steps.
 PHS_FRAMES = int(NTIME / PHS_INT)    # How many frames of our phase space plot we'll have.
 
-DCLOSE_METRE = 15000        # track if closer than this
+DCLOSE_METRE = 1000.        # track if closer than this
+LINKED_THRESH = 5.          # Count objects initialized closer than 5m together as the same object
 
 PLOT = True     # If we want to create the plots directly in satEvol
 
@@ -60,29 +62,28 @@ J2 = 1082.64e-6           # Arcane kinematic parameters
 muE = 3.986004418e14
 
 # Nerd stuff
-F_CHUNK = int(5e4)   # How many time steps we wait between dumping to outfile
+F_CHUNK = int(50)   # How many time steps we wait between dumping to outfile
 
 # Helper I/O functions
 # Read infile of TLEs and return a structured array of satellites
-def readTLEs(path: str, phase_outfile: bool = False) -> np.array:
+def readTLEs(path: str, phase_outfile: bool = False, check_linked: bool = True) -> tuple:
     if phase_outfile: woh = open(PHASE_FOUT,"w")
 
     with open(path,'r') as f:
         lines = f.readlines()
         NSat = int(len(lines)/3) # Total number of satellites, assuming three lines per
 
-        names = np.zeros(NSat, dtype='U10')
-        a = np.zeros(NSat, dtype='f8')
-        ma = np.zeros(NSat, dtype='f8')
-        omega = np.zeros(NSat, dtype='f8')
-        Omega = np.zeros(NSat, dtype='f8')
-        Omega_dot = np.zeros(NSat, dtype='f8')
-        n = np.zeros(NSat, dtype='f8')
-        ecc = np.zeros(NSat, dtype='f8')
-        inc = np.zeros(NSat, dtype='f8')
+        # names = np.zeros(NSat, dtype='U10')
+        # a = np.zeros(NSat, dtype='f8')
+        # ma = np.zeros(NSat, dtype='f8')
+        # omega = np.zeros(NSat, dtype='f8')
+        # Omega = np.zeros(NSat, dtype='f8')
+        # Omega_dot = np.zeros(NSat, dtype='f8')
+        # n = np.zeros(NSat, dtype='f8')
+        # ecc = np.zeros(NSat, dtype='f8')
+        # inc = np.zeros(NSat, dtype='f8')
 
-        pos = np.zeros(NSat, dtype=('f8', 3))
-        vel = np.zeros(NSat, dtype=('f8', 3))
+        names, a, ma, omega, Omega, Omega_dot, n, ecc, inc = [], [], [], [], [], [], [], [], []
 
         satIndex = 0
         for i, line in enumerate(lines):
@@ -107,55 +108,128 @@ def readTLEs(path: str, phase_outfile: bool = False) -> np.array:
                 sat_a, sat_ecc, sat_omega, sat_inc, sat_Omega, sat_nu = KT.getORBELM(r, v, muE)
 
                 sat_ma = KT.meanAnom(sat_ecc, sat_nu)  # Mean anomaly
-                sat_n = np.sqrt(G*MEarth/sat_a**3) # Inverse period
-                sat_Omega_dot = -1.5*(REarth)**2 / (sat_a*(1 - sat_ecc))**2 * J2 * sat_n * np.cos(sat_inc) # Precession rate
+                sat_n = np.sqrt(G*MEarth/sat_a**3) # Mean angular motion
+                sat_Omega_dot = -1.5*(REarth)**2 / (sat_a*(1 - sat_ecc**2))**2 * J2 * sat_n * np.cos(sat_inc) # Precession rate
 
                 if sat_a*(1 - sat_ecc) < P_THRESH:
-                    names[satIndex] = sname
-                    a[satIndex] = sat_a
-                    ma[satIndex] = sat_ma
-                    omega[satIndex] = sat_omega
-                    Omega[satIndex] = sat_Omega
-                    Omega_dot[satIndex] = sat_Omega_dot
-                    n[satIndex] = sat_n
-                    ecc[satIndex] = sat_ecc
-                    inc[satIndex] = sat_inc
+                    # names[satIndex] = sname
+                    # a[satIndex] = sat_a
+                    # ma[satIndex] = sat_ma
+                    # omega[satIndex] = sat_omega
+                    # Omega[satIndex] = sat_Omega
+                    # Omega_dot[satIndex] = sat_Omega_dot
+                    # n[satIndex] = sat_n
+                    # ecc[satIndex] = sat_ecc
+                    # inc[satIndex] = sat_inc
+
+                    names.append(sname)
+                    a.append(sat_a)
+                    ma.append(sat_ma)
+                    omega.append(sat_omega)
+                    Omega.append(sat_Omega)
+                    Omega_dot.append(sat_Omega_dot)
+                    n.append(sat_n)
+                    ecc.append(sat_ecc)
+                    inc.append(sat_inc)
 
                     if phase_outfile: woh.write("{},{},{},{},{},{},{}\n".format(sname, r_km[0], r_km[1], r_km[2], v_km[0], v_km[1], v_km[2]))
                 satIndex += 1
 
+    pos, vel = KT.getXYZVVV(np.array(ma), np.array(a), np.array(omega), np.array(ecc), 
+                            np.array(Omega), np.array(inc), np.array(n))
+    
+    pos = pos.tolist()
+    vel = vel.tolist()
+
     if phase_outfile: woh.close()
+    if check_linked:
+        print('Checking for linked objects...')
+        linkedIndices = threshQuery(pos, LINKED_THRESH, pairwise=False)
+        removedIndices = []
+
+        for i in range(len(linkedIndices)):
+            if len(linkedIndices[i]) == 1 or i in removedIndices: continue
+            for j in linkedIndices[i]:
+                names[i] += '_' + names[j]
+
+                del names[j]
+                del a[j]
+                del ma[j]
+                del omega[j]
+                del Omega[j]
+                del Omega_dot[j]
+                del n[j]
+                del ecc[j]
+                del inc[j]
+                del pos[j]
+                del vel[j]
+
+                removedIndices.append(j)
+
+        print('Number of satellites linked: {}'.format(len(removedIndices)))
+
+    # Convert everything back to arrays to feed into class
+    names = np.array(names, dtype='U10')
+    a = np.array(a, dtype='f8')
+    ma = np.array(ma, dtype='f8')
+    omega = np.array(omega, dtype='f8')
+    Omega = np.array(Omega, dtype='f8')
+    Omega_dot = np.array(Omega_dot, dtype='f8')
+    n = np.array(n, dtype='f8')
+    ecc = np.array(ecc, dtype='f8')
+    inc = np.array(inc, dtype='f8')
+    pos = np.array(pos, dtype=('f8', 3))
+    vel = np.array(vel, dtype=('f8', 3))
+
     return names, a, ma, omega, Omega, Omega_dot, n, ecc, inc, pos, vel
 
-def writeOutfile(prop: dict, type='close-approach') -> None:
-    for i in range(len(prop['t'])):
-        fh.write("{},{},{},{},{},{},{},{}\n".format(prop['t'][i], prop['dist'][i], prop['vel'][i], 
-                                                    prop['alt'][i], prop['id1'][i], prop['id2'][i], prop['name1'][i], prop['name2'][i]))
+def writeOutfile(conjList: tuple, fname: str, type='close-approach') -> None:
+    with open(fname, 'a', newline='') as f:
+        for i in range(len(conjList)):
+            conj = conjList[i]._asdict()
+            writer = csv.writer(f, delimiter=',')
+            writer.writerows(zip(conj['t'], conj['dist'], conj['vel'], conj['alt'],
+                                 conj['id1'], conj['id2'], conj['name1'], conj['name2']))
+
         
 # Distance searching function (can't be jitted because of SciPy)
-def threshQuery(satArr: satArray, d: float):
-    satPosTree = KDTree(satArr.pos)
-    return satPosTree.query_pairs(d, output_type='ndarray')
+def threshQuery(pos: np.ndarray, d: float, pairwise: bool = True):
+    posTree = KDTree(pos)
+    if pairwise: return posTree.query_pairs(d, output_type='ndarray')
+    else: return posTree.query_ball_tree(posTree, d)
 
 # ================= MAIN BLOCK ================= #
 
 def main() -> None:
     # Read in TLEs
-    satData = readTLEs(TLES_FILENAME, phase_outfile=True)
+    print('Reading TLEs...')
+    satData = readTLEs(TLES_FILENAME, phase_outfile=True, check_linked=True)
+
     Satellites = satArray(satData[0], satData[1], satData[2], satData[3], satData[4], satData[5],
-                          satData[6], satData[7], satData[8], satData[9], satData[10])
+                          satData[6], satData[7], satData[8], satData[9], satData[10])  # For some reason this doesn't construct if I just pass the tuple in
+    
+    print('Total # of satellites: {}'.format(Satellites.NSat))
 
     # Initialize satellite positions
     Satellites.updateKinematics()
+
+    simTime = 0
+    conjunctionData = []
     
     # Main integration
+    print('Beginning main integration... \nTotal time: {}s'.format(TTIME))
     for itime in range(NTIME):
         Satellites.updateOrbit(DT)
-        Satellites.updateKinematics()
-        print(itime*DT)
 
-        closeIndices = threshQuery(Satellites, DCLOSE_METRE)
-        conjData = Satellites.getConjunctionData(closeIndices)
+        closeIndices = threshQuery(Satellites.pos, DCLOSE_METRE)
+        conjunctionData.append(Satellites.getConjunctionData(closeIndices))
+
+        if itime % F_CHUNK == 0: 
+            writeOutfile(conjunctionData, OUTFILE)
+            conjunctionData.clear()
+
+        print(simTime)
+        simTime += DT
 
 
 if __name__ == '__main__':

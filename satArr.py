@@ -2,29 +2,33 @@ import numpy as np
 import numba as nb
 
 from numba.experimental import jitclass
+from collections import namedtuple
 
 import KeplerTools as KT
 
 # Constants
 tau = 2*np.pi
+REarth = 6378.135e3 
 
+# Data Structures
 satSpec = (
-    ('names', nb.from_dtype(np.dtype('U10'))[:]),
-    ('a', nb.float64[:]),
-    ('ma', nb.float64[:]),
-    ('omega', nb.float64[:]),
+    ('names', nb.from_dtype(np.dtype('U10'))[:]),   # Name
+    ('a', nb.float64[:]),                           # Semi-major axis
+    ('ma', nb.float64[:]),                          # Mean anomaly
+    ('omega', nb.float64[:]),                       # Angular velocity
     ('Omega', nb.float64[:]),
-    ('Omega_dot', nb.float64[:]),
-    ('n', nb.float64[:]),
-    ('e', nb.float64[:]),
-    ('I', nb.float64[:]),
-    ('pos', nb.float64[:, :]),
-    ('vel', nb.float64[:, :]),
-    ('t', nb.float64),
-    ('NSat', nb.float64),
-    ('NConj', nb.float64)
-
+    ('Omega_dot', nb.float64[:]),                   # Precession rate
+    ('n', nb.float64[:]),                           # Inverse period
+    ('e', nb.float64[:]),                           # Eccentricity
+    ('I', nb.float64[:]),                           # Inclination
+    ('pos', nb.float64[:, :]),                      # Position
+    ('vel', nb.float64[:, :]),                      # Velocity
+    ('t', nb.float64),                              # Current time
+    ('NSat', nb.int64),                           # Total number of objects
+    ('NConj', nb.int64)                           # Total number of conjunctions at a given time
 )
+
+conjEvent = namedtuple('conjunctionEvent', ['t', 'dist', 'vel', 'alt', 'id1', 'id2', 'name1', 'name2'])
 
 @jitclass(satSpec)
 class satArray(object):
@@ -45,7 +49,7 @@ class satArray(object):
         self.vel = vel
 
         self.t = 0.
-        self.NSat = len(self.names)
+        self.NSat = int(len(self.names))
         self.NConj = 0
 
     # Simulation methods
@@ -55,14 +59,32 @@ class satArray(object):
     def updateOrbit(self, dt: float) -> None:
         self.ma = (self.ma + self.n*dt) % tau               # Advance anomaly
         self.Omega = (self.Omega + self.Omega_dot*dt) % tau # Advance node
-        self.t += dt
+        self.t += dt                                        # Advance time
+
+        self.updateKinematics()
 
     def getConjunctionData(self, arr: np.ndarray) -> tuple:
         self.NConj = len(arr)
-        pairs = np.array([(arr[i, 0], arr[i, 1]) for i in range(self.NConj)])
 
-        # Pickup here
-        relD = self.pos[pairs[:, 0]] - self.pos[pairs[:, 1]]
-        relV = self.vel[pairs[:, 0]] - self.vel[pairs[:, 1]]
+        # Create arrays of the indices of the involved satellites
+        i1 = arr[:, 0]
+        i2 = arr[:, 1]
+
+        # Get satellite names
+        satOne = self.names[i1]
+        satTwo = self.names[i2]
+
+        # Compute relative distances and velocities
+        relD_vec = self.pos[i1] - self.pos[i2]
+        relV_vec = self.vel[i1] - self.vel[i2]
+
+        relD = KT.getNorm(relD_vec)
+        relV = KT.getNorm(relV_vec)
+
+        # Compute altitudes
+        alt = np.sqrt(self.pos[0]**2 + self.pos[1]**2 + self.pos[2]**2) - REarth
+        time = [self.t for i in range(len(arr))]
+
+        return conjEvent(time, relD, relV, alt, i1, i2, satOne, satTwo)
 
     
