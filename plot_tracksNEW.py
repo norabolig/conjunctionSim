@@ -12,6 +12,7 @@ TMAX=5*60  # CHOOSE MAX TIME FOR PLOT HERE
 DTSEP=1000
 PLOTSTAR=False
 PLOT_SUFFIX='_full_7day_10km_cut'
+PLOT_STARLINK=True
 OUTPUTENCOUNTER=True  # CHOOSE IF YOU WANT TO SAVE ENCOUNTER DATA
 
 FILENAME = 'out/track_close_encounters_7day_10km.dat'  # PUT IN YOUR OUTPUT FILE HERE
@@ -51,7 +52,7 @@ satstarsum=0
 rbrbsum=0
 debdebsum=0
 
-plt.figure(figsize=(12,4))
+fig, ax = plt.subplots(figsize=(12,4))
 
 while True:
     if time.size<1: break
@@ -164,9 +165,9 @@ while True:
     cclose.append(carray)
     
     if PLOTSTAR:
-        plt.plot(time[flag]/60,dist[flag]/1e3,ls=ls,color=carray)
+        plt.plot(time[flag]/60/60,dist[flag]/1e3,ls=ls,color=carray)
     else:
-        plt.plot(time[flag]/60,dist[flag]/1e3,color=carray)
+        plt.plot(time[flag]/60/60,dist[flag]/1e3,color=carray)
         
     time=np.delete(time,flag)
     dist=np.delete(dist,flag)
@@ -194,16 +195,33 @@ custom_lines = [Line2D([0], [0], color='green', lw=4),
                 Line2D([0], [0], color='orange', lw=4),
                 Line2D([0], [0], color='purple', lw=4),
                 Line2D([0], [0], color='pink', lw=4)]
-plt.legend(custom_lines, ['DEB-DEB: {}'.format(debdebsum), 'SAT-DEB: {}({})'.format(debsatsum,debstarsum), 
-                          'SAT-SAT: {}({})'.format(satsatsum,satstarsum),
-                          'SAT-R/B: {}({})'.format(rbsatsum,rbstarsum),
-                          'DEB-R/B: {}'.format(rbdebsum),
-                          'R/B-R/B: {}'.format(rbrbsum)], ncol=3)
-plt.xlabel("Time in minutes")
-plt.ylabel("Conjunction Distance [km]")
-plt.title('Total number of close encounters < {} km is {}'.format(CLOSE/1e3,sum))
+if PLOT_STARLINK:
+    plt.legend(custom_lines, ['DEB-DEB: {}'.format(debdebsum), 
+                              'SAT-DEB: {}({})'.format(debsatsum,debstarsum), 
+                              'SAT-SAT: {}({})'.format(satsatsum,satstarsum),
+                              'SAT-R/B: {}({})'.format(rbsatsum,rbstarsum),
+                              'DEB-R/B: {}'.format(rbdebsum),
+                              'R/B-R/B: {}'.format(rbrbsum)], ncol=3,
+               fontsize=14,
+               loc='lower center', bbox_to_anchor=(0.0, 1.01, 1., 0.5),
+               bbox_transform=ax.transAxes)
+else:
+    plt.legend(custom_lines, ['DEB-DEB: {}'.format(debdebsum), 
+                              'SAT-DEB: {}'.format(debsatsum), 
+                              'SAT-SAT: {}'.format(satsatsum),
+                              'SAT-R/B: {}'.format(rbsatsum),
+                              'DEB-R/B: {}'.format(rbdebsum),
+                              'R/B-R/B: {}'.format(rbrbsum)], ncol=3,
+               fontsize=14,
+               loc='lower center', bbox_to_anchor=(0.0, 1.01, 1., 0.5),
+               bbox_transform=ax.transAxes)
+plt.xlabel("Time [hrs]", fontsize=16)
+plt.ylabel("Conjunction Distance [km]", fontsize=16)
+plt.ylim(-0.05,1.0)
+plt.xlim(TMIN,TMAX/60/60)
+plt.text(0.01,0.025,'Total close encounters < {} km: {}'.format(CLOSE/1e3,sum), 
+         fontsize=16, transform=ax.transAxes)
 plt.savefig("./out/close_approach_tracks_fit{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
-
 
 
 print("Total detected approaches < {} km is {}".format(CLOSE/1e3,sum))
