@@ -13,7 +13,7 @@ TMAX=5*60  # max time for plot
 DTSEP=1000
 PLOTSTAR=False
 PLOT_SUFFIX='_full_7day_10km_cut'  # plot name suffix
-PLOT_STARLINK = True # choose if you want to note number of starlink-specific encounteres
+PLOT_STARLINK = True # choose if you want to note number of starlink-specific encounters
 SAVE = True  # choose if you want to save plots
 OUTPUTENCOUNTER=True  # choose if you want to save encounter data
 
