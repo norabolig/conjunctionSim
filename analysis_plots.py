@@ -16,7 +16,7 @@ PLOT_SUFFIX='_full_5day'  # plot name suffix
 PLOT_STARLINK = True # choose if you want to note number of starlink-specific encounteres
 SAVE = True  # choose if you want to save plots
 
-encounters = pd.read_hdf('out/output_filtered_output.hdf')
+encounters = pd.read_hdf('out/filtered_output_5day_1km_encounter_data.hdf')
 
 dclose = encounters.dist.astype(float).values
 vclose = encounters.dV.astype(float).values
