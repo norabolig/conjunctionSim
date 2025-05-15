@@ -13,17 +13,22 @@ CLOSE=1e3 # close encounter distance
 TMIN=0  # min time for plot
 TMAX=5*24*60*60  # max time for plot
 PLOT_SUFFIX='_full_5day'  # plot name suffix
-PLOT_STARLINK = True # choose if you want to note number of starlink-specific encounteres
+PLOT_STARLINK = True # choose if you want to note number of starlink-specific encounters
 SAVE = True  # choose if you want to save plots
 
 encounters = pd.read_hdf('out/filtered_output_5day_1km_encounter_data.hdf')
-
 dclose = encounters.dist.astype(float).values
-vclose = encounters.dV.astype(float).values
-altclose = encounters.alt.astype(float).values
 tclose = encounters.time.astype(float).values
-cclose = encounters.type.values
-subset = encounters.loc[(encounters.dist>0)&(encounters.dist<CLOSE)&(encounters.time>TMIN)&(encounters.time<TMAX)]
+
+subset = encounters.loc[(dclose>0)&(dclose<CLOSE)&(tclose>TMIN)&(tclose<TMAX)]
+
+dclose = subset.dist.astype(float).values
+vclose = subset.dV.astype(float).values
+altclose = subset.alt.astype(float).values
+tclose = subset.time.astype(float).values
+cclose = subset.type.values
+
+print('plotting!')
 
 bins=[np.linspace(0,CLOSE/1e3,20), np.linspace(0,16,20)]
 fig, ax = plt.subplots(2,3, figsize=(10,7))
