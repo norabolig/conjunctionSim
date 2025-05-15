@@ -17,8 +17,8 @@ PLOT_STARLINK = True # choose if you want to note number of starlink-specific en
 SAVE = True  # choose if you want to save plots
 OUTPUTENCOUNTER=True  # choose if you want to save encounter data
 
-FILENAME = 'out/track_close_encounters_7day_10km.dat'  # PUT IN YOUR OUTPUT FILE HERE
-OUTPUTFILE = 'out/output_track_close_encounters_7day_10km.hdf'  # FOR IF YOU WANT TO SAVE ENCOUNTER DATA
+FILENAME = 'out/filtered_output_5day.dat'  # PUT IN YOUR OUTPUT FILE HERE
+OUTPUTFILE = 'out/filtered_output_5day_encounter_data.hdf'  # FOR IF YOU WANT TO SAVE ENCOUNTER DATA
 
 columns = ['time','dist','dv', 'alt', 'index1', 'index2', 'name1', 'name2']
 dat = pd.read_csv(FILENAME, delimiter=',', header=None)  # PUT IN YOUR OUTPUT FILE HERE
