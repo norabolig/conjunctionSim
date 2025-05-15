@@ -18,7 +18,7 @@ SAVE = True  # choose if you want to save plots
 OUTPUTENCOUNTER = True  # choose if you want to save encounter data
 
 FILENAME = 'out/filtered_output_5day_1km.dat'  # PUT IN YOUR OUTPUT FILE HERE
-OUTPUTFILE = 'out/filtered_output_5day_1km_encounter_data.hdf'  # FOR IF YOU WANT TO SAVE ENCOUNTER DATA
+OUTPUTFILE = 'out/filtered_output_encounter_data_5day_1km.hdf'  # FOR IF YOU WANT TO SAVE ENCOUNTER DATA
 
 columns = ['time','dist','dv', 'alt', 'index1', 'index2', 'name1', 'name2']
 dat = pd.read_csv(FILENAME, delimiter=',', header=None)  # PUT IN YOUR OUTPUT FILE HERE
