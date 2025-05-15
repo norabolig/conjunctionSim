@@ -260,7 +260,7 @@ for i in range(2):
 
 plt.subplots_adjust(wspace=0.35,hspace=0.45)
 if SAVE:
-    plt.savefig("./out/relative_dist_vel_{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
+    plt.savefig("./out/relative_dist_vel{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
 
 #========================================================================================
 
@@ -273,7 +273,7 @@ plt.ylabel('Counts', fontsize=16)
 plt.legend(fontsize=16)
 ax.tick_params(labelsize=16)
 if SAVE:
-    plt.savefig("./out/vclose_sat_hist_{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
+    plt.savefig("./out/vclose_sat_hist{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
 
 #========================================================================================
 
@@ -286,7 +286,7 @@ plt.xlabel('Time [hr]', fontsize=16)
 plt.ylabel('Altitude [km]', fontsize=16)
 ax.tick_params(labelsize=16)
 if SAVE:
-    plt.savefig("./out/time_alt_encounters_{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
+    plt.savefig("./out/time_alt_encounters{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
 
 #========================================================================================
 
@@ -316,7 +316,7 @@ plt.ylabel('Counts',fontsize=16)
 ax.tick_params(labelsize=16)
 plt.xlim(TMIN/(3600),TMAX/(3600))
 if SAVE:
-    plt.savefig("./out/time_encounters_hist_{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
+    plt.savefig("./out/time_encounters_hist{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
 
 #========================================================================================
 
@@ -336,4 +336,4 @@ ax.set_xticks(np.arange(300,2100,300))
 plt.ylabel('Avg. close encounter rate < {} km [min]'.format(int(CLOSE/1e3)),
           fontsize=16)
 if SAVE:
-    plt.savefig("./out/frequency_{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
+    plt.savefig("./out/frequency{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
