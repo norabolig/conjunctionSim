@@ -324,7 +324,7 @@ fig, ax = plt.subplots(figsize=(8,6))
 altbins = np.arange(200,2000,1)
 h,bins = np.histogram(altclose/1e3,bins=altbins)
 binmids = (bins[:-1]+bins[1:])/2
-plt.plot(binmids,40*60/h,color='k')
+plt.plot(binmids,MAXSIMTIME/(60*h),color='k')
 plt.xlim(200,2000)
 plt.axhline(MAXSIMTIME/60,ls='--',color='xkcd:grey',label='max sim. time')
 plt.axhline(20,color='xkcd:red',ls='--',label='20 minutes')
