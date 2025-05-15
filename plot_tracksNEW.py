@@ -11,6 +11,7 @@ TMIN=0
 TMAX=5*60  # CHOOSE MAX TIME FOR PLOT HERE
 DTSEP=1000
 PLOTSTAR=False
+PLOT_SUFFIX='_full_7day_10km_cut'
 OUTPUTENCOUNTER=True  # CHOOSE IF YOU WANT TO SAVE ENCOUNTER DATA
 
 FILENAME = 'out/track_close_encounters_7day_10km.dat'  # PUT IN YOUR OUTPUT FILE HERE
@@ -201,7 +202,7 @@ plt.legend(custom_lines, ['DEB-DEB: {}'.format(debdebsum), 'SAT-DEB: {}({})'.for
 plt.xlabel("Time in minutes")
 plt.ylabel("Conjunction Distance [km]")
 plt.title('Total number of close encounters < {} km is {}'.format(CLOSE/1e3,sum))
-plt.savefig("./out/close_approach_tracks_fit.pdf", bbox_inches="tight")
+plt.savefig("./out/close_approach_tracks_fit{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
 
 
 
@@ -241,7 +242,7 @@ ax[1,2].set_ylabel('dv at min. close approach [km/s]')
 ax[1,2].set_title('R/B-R/B')
 
 plt.subplots_adjust(wspace=0.3,hspace=0.4)
-plt.savefig("./out/relative_dist_vel.pdf", bbox_inches="tight")
+plt.savefig("./out/relative_dist_vel{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
 
 #========================================================================================
 
@@ -249,7 +250,7 @@ plt.figure()
 h,bins,_ = plt.hist(vclose[cclose=='red']/1e3,bins=50);
 plt.xlabel('dv at min. close approach [km/s]')
 plt.title('SAT-SAT, < 1km')
-plt.savefig("./out/vclose_sat_hist.pdf", bbox_inches="tight")
+plt.savefig("./out/vclose_sat_hist{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
 
 #========================================================================================
 
@@ -258,7 +259,7 @@ plt.hist2d(tclose/60/60, altclose/1e3, norm=LogNorm(), bins=30);
 plt.colorbar(label='No. of close encounters < {} km'.format(int(CLOSE/1e3)))
 plt.xlabel('Time [hr]')
 plt.ylabel('Altitude [km]')
-plt.savefig("./out/time_alt_encounters.pdf", bbox_inches="tight")
+plt.savefig("./out/time_alt_encounters{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
 
 #========================================================================================
 
@@ -284,7 +285,7 @@ plt.legend(custom_lines, ['DEB-DEB: {}'.format(debdebsum), 'SAT-DEB: {} ({})'.fo
 plt.xlabel('Time of a close encounter < {} km [hr]'.format(int(CLOSE/1e3)))
 plt.ylabel('Counts')
 plt.xlim(0,TMAX/60/60)
-plt.savefig("./out/time_encounters_hist.pdf", bbox_inches="tight")
+plt.savefig("./out/time_encounters_hist{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
 
 #========================================================================================
 
@@ -300,4 +301,4 @@ plt.yscale('log')
 plt.legend()
 plt.xlabel('Altitude [km]')
 plt.ylabel('Avg. time between close encounters < {} km [min]'.format(int(CLOSE/1e3)))
-plt.savefig("./out/frequency.pdf", bbox_inches="tight")
+plt.savefig("./out/frequency{}.pdf".format(PLOT_SUFFIX), bbox_inches="tight")
