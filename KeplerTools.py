@@ -103,29 +103,7 @@ def get_Qs(w, O, inc) -> np.ndarray:
     Qs[:, 2, 0] = sinW*sinI
     Qs[:, 2, 1] = cosW*sinI
 
-    # print(Qs)
-
     return Qs
-
-# @njit
-# def get_dQs(w0,O,inc):
-#     Q=np.zeros((3,2))
-#     Q[1][0] =-np.sin(w0)*np.cos(O)*np.sin(inc) 
-#     Q[1][1] = -np.cos(w0)*np.cos(O)*np.sin(inc)
-#     Q[2][0] = np.sin(w0)*np.cos(inc)
-#     Q[2][1] = np.cos(w0)*np.cos(inc)
-#     return Q
-
-# @njit
-# def get_dQOs(w0,O,inc):
-#     Q=np.zeros((3,2))
-#     Q[0][0]=-np.cos(w0)*np.sin(O)-np.sin(w0)*np.cos(O)*np.cos(inc)
-#     Q[0][1]=+np.sin(w0)*np.sin(O)-np.cos(w0)*np.cos(O)*np.cos(inc)
-#     Q[1][0] =np.cos(w0)*np.cos(O)-np.sin(w0)*np.sin(O)*np.cos(inc) 
-#     Q[1][1] = -np.sin(w0)*np.cos(O)-np.cos(w0)*np.sin(O)*np.cos(inc)
-#     Q[2][0] = 0.
-#     Q[2][1] = 0.
-#     return Q
 
 @njit
 def getXYZVVV(nu, a, w0, ecc, O, inc, n, m0=MEarth, m1=0., G=6.6743e-11):

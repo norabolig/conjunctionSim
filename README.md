@@ -43,16 +43,8 @@ In approximately decreasing priority,
 - Implement mode to calculate how long until first <200m close approach
 
 1. ~~Implement distance more efficient nearest-neighbour search - SciPy KDTree should be O(n log n) instead of O(n^2).~~
-2. Vectorize KeplerTools
-> Partially done
-3. Implement numba (JIT compilation) and (probably) parallelize
-> Also partially done, only in KT right now, will need to reorganize program structure to parallelize better
-4. Extend SatEvol to examine phase-space mixing.
-    - Write nearest-neighbour quantities to outfile
-    - Constrain distances under X km to examine tail (handled by plotting helper?)
-    - Add counter for time
-    - Make histograms 2d, add lines on 1d to indicate median quantities
-
+2. ~~Vectorize KeplerTools~~
+3. ~~Implement numba (JIT compilation)~~ and (probably) parallelize
 4. Re-evaluate performance and decide if it needs to be translated
 5. Remove plotting and create a helper program to take care of it afterwards for deployment
 

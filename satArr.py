@@ -12,7 +12,7 @@ REarth = 6378.135e3
 
 # Data Structures
 satSpec = (
-    ('names', nb.from_dtype(np.dtype('U10'))[:]),   # Name
+    ('names', nb.from_dtype(np.dtype('U20'))[:]),   # Name
     ('a', nb.float64[:]),                           # Semi-major axis
     ('ma', nb.float64[:]),                          # Mean anomaly
     ('omega', nb.float64[:]),                       # Angular velocity
@@ -54,9 +54,15 @@ class satArray(object):
 
     # Simulation methods
     def updateKinematics(self) -> None:
+        """
+        Recalculates all satellite positions and velocities using the currently stored orbital elements.
+        """
         self.pos, self.vel = KT.getXYZVVV(self.ma, self.a, self.omega, self.e, self.Omega, self.I, self.n)
 
     def updateOrbit(self, dt: float) -> None:
+        """
+        Advances the orbit of all satellites by a specified time-step dt, including positions and velocities.
+        """
         self.ma = (self.ma + self.n*dt) % tau               # Advance anomaly
         self.Omega = (self.Omega + self.Omega_dot*dt) % tau # Advance node
         self.t += dt                                        # Advance time
@@ -64,6 +70,23 @@ class satArray(object):
         self.updateKinematics()
 
     def getConjunctionData(self, arr: np.ndarray) -> tuple:
+        """
+        Returns conjunction data for selected satellites at the current time-step.
+
+        Parameters:
+            arr (array): An array containing arrays with pairs of indices for which conjunction data should be calculated.
+
+        Returns:
+            conjEvent (namedTuple): A tuple of arrays containing data for all conjunctions accessible via keyword:
+                Time: ['t']
+                Relative distance: ['dist']
+                Relative velocity: ['vel']
+                Altitude of first satellite: ['alt']
+                Index of first satellite: ['id1']
+                Index of second satellite: ['id2']
+                Name of first satellite: ['name1']
+                Name of second satellite: ['name2']
+        """
         self.NConj = len(arr)
 
         # Create arrays of the indices of the involved satellites
