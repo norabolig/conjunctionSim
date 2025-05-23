@@ -167,6 +167,9 @@ def getORBELM(r_vec,v_vec,mu):
 
 @njit
 def getNorm(arr: np.ndarray) -> np.ndarray:
+  """
+  Calculates the magnitudes of an array of vectors, returns an array of scalars.
+  """
   norms = np.zeros(len(arr))
   for i in range(len(arr)):
     norms[i] = np.sqrt(arr[i, 0]*arr[i, 0] + arr[i, 1]*arr[i, 1] + arr[i, 2]*arr[i, 2])

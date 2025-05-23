@@ -8,9 +8,6 @@
 # External dependencies
 import numpy as np
 import pandas as pd
-import matplotlib.pylab as plt
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
 import sgp4.api as sgp4
 import csv
 
@@ -22,9 +19,9 @@ from satArr import satArray
 
 # Select TLE Catalogue
 # Also set epoch information for TLEs
-# TLES_FILENAME = "./in/starlink_07OCT2024.tles"
-TLES_FILENAME = "./in/full_cat.tles"
-OUT_SUFFIX = '10m_approach_dt_0p001'
+TLES_FILENAME = "./in/starlink_07OCT2024.tles"
+# TLES_FILENAME = "./in/full_cat.tles"
+OUT_SUFFIX = 'random_orbit_test'
 JD = 2460591.5
 FR = 0.0
 JDOFFSET = 100
@@ -33,8 +30,8 @@ EPOCHLIM = 24280
 # Constants and parameters
 ECCSCALE = 0.0002         # Make eccentric enough to fill shells for any artificial systems
 SMASCALE = 1000           # km to metres
-DT = 0.001                 # Time step in seconds
-TTIME = 604800           # How long to run sim (s)
+DT = 0.05                 # Time step in seconds
+TTIME = 120           # How long to run sim (s)
 NTIME = int(TTIME / DT)   # Number of steps
 
 EXAMINE_PHS = False                   # Flag to determine if we examine phase-space mixing and produce histograms
@@ -42,10 +39,11 @@ PHS_INT_S = 3600                      # How many seconds to wait between calcula
 PHS_INT = int(PHS_INT_S / DT)        # and how many time steps.
 PHS_FRAMES = int(NTIME / PHS_INT)    # How many frames of our phase space plot we'll have.
 
-DCLOSE_METRE = 20.        # track if closer than this
-LINKED_THRESH = 5.          # Count objects initialized closer than 5m together as the same object
+DCLOSE_METRE = 15000.        # track if closer than this
 
-PLOT = False     # If we want to create the plots directly in satEvol
+PLOT = False           # If we want to create the plots directly in satEvol
+RANDOM_ORBITS = True   # Randomizes nodes and mean anomalies before running
+LINK = True           # Links objects that are close together before running
 
 twopi = np.pi*2             # How many pi??
 MEarth = 5.97e24            # Mass of Earth (kg)
@@ -88,19 +86,19 @@ def readTLEs(TLE_path: str, PHASE_path: str, check_linked: bool = True) -> tuple
 
     with open(TLE_path,'r') as f:
         lines = f.readlines()
-        NSat = int(len(lines)/3) # Total number of satellites, assuming three lines per
+        TotalSat = int(len(lines)/3) # Total number of satellites, assuming three lines per
 
-        names = np.zeros(NSat, dtype='U20')
-        a = np.zeros(NSat, dtype='f8')
-        ma = np.zeros(NSat, dtype='f8')
-        omega = np.zeros(NSat, dtype='f8')
-        Omega = np.zeros(NSat, dtype='f8')
-        Omega_dot = np.zeros(NSat, dtype='f8')
-        n = np.zeros(NSat, dtype='f8')
-        ecc = np.zeros(NSat, dtype='f8')
-        inc = np.zeros(NSat, dtype='f8')
-        pos = np.zeros(NSat, dtype=('f8', 3))
-        vel = np.zeros(NSat, dtype=('f8', 3))
+        names = np.zeros(TotalSat, dtype='U30')
+        a = np.zeros(TotalSat, dtype='f8')
+        ma = np.zeros(TotalSat, dtype='f8')
+        omega = np.zeros(TotalSat, dtype='f8')
+        Omega = np.zeros(TotalSat, dtype='f8')
+        Omega_dot = np.zeros(TotalSat, dtype='f8')
+        n = np.zeros(TotalSat, dtype='f8')
+        ecc = np.zeros(TotalSat, dtype='f8')
+        inc = np.zeros(TotalSat, dtype='f8')
+        pos = np.zeros(TotalSat, dtype=('f8', 3))
+        vel = np.zeros(TotalSat, dtype=('f8', 3))
 
         satIndex = 0
         for i, line in enumerate(lines):
@@ -151,7 +149,7 @@ def readTLEs(TLE_path: str, PHASE_path: str, check_linked: bool = True) -> tuple
         woh_df = pd.read_csv(PHASE_path, header=None)
         woh_df.columns = ['name','x','y','z','vx','vy','vz']
 
-        woh_df = woh_df[['x', 'y', 'z']].div(20)    # Check ~50m around stuff
+        woh_df = woh_df[['x', 'y', 'z']].div(10)    # Check ~50m around stuff
         woh_df = woh_df[['x', 'y', 'z']].round(0)   # This is a jank solution I need to clean up
 
         woh_keep = woh_df.drop_duplicates(['x','y','z'], keep='first').index.to_numpy()
@@ -168,13 +166,16 @@ def readTLEs(TLE_path: str, PHASE_path: str, check_linked: bool = True) -> tuple
         pos         = pos[woh_keep]
         vel         = vel[woh_keep]
 
-        print(f'No. of satellites linked: {NSat - len(woh_keep)}')
+        print(f'No. of satellites linked: {TotalSat - len(woh_keep)}')
         
     woh.close()
 
     return names, a, ma, omega, Omega, Omega_dot, n, ecc, inc, pos, vel
 
 def writeOutfile(conjList: tuple, fname: str, type='close-approach') -> None:
+    """
+    Writes a list of conjunction events to an outfile.
+    """
     with open(fname, 'a', newline='') as f:
         for i in range(len(conjList)):
             conj = conjList[i]._asdict()
@@ -214,7 +215,7 @@ def main() -> None:
 
     # Read in TLEs
     print('Reading TLEs...')
-    satData = readTLEs(TLES_FILENAME, PHASE_FOUT, check_linked=True)
+    satData = readTLEs(TLES_FILENAME, PHASE_FOUT, check_linked=LINK)
 
     Satellites = satArray(satData[0], satData[1], satData[2], satData[3], satData[4], satData[5],
                           satData[6], satData[7], satData[8], satData[9], satData[10])  # For some reason this doesn't construct if I just pass the tuple in
@@ -222,13 +223,17 @@ def main() -> None:
     print(f'Total no. of satellites: {Satellites.NSat}')
 
     # Initialize satellite positions
+    if RANDOM_ORBITS: 
+        print('Randomizing orbits...')
+        Satellites.randomizeOrbits()
+
     Satellites.updateKinematics()
 
     simTime = 0
     conjunctionData = []
     
     # Main integration
-    print(f'Beginning main integration... \nTotal time: {TTIME}s')
+    print(f'Beginning main integration for {TTIME}s')
     for itime in range(NTIME):
         Satellites.updateOrbit(DT)
 
@@ -243,8 +248,10 @@ def main() -> None:
             OUTFILE = f"./out/track_out_{OUT_SUFFIX}_{NEWFILE_INDEX}.dat"
             NEWFILE_INDEX += 1
 
-        print(f'Time: {str(simTime)[0:5]}. Number of conjunctions: {Satellites.NConj}', end='\r')
+        print(f'Time: {str(simTime)[0:6]}s  |  No. of conjunctions: {Satellites.NConj}', end='\r')
         simTime += DT
+
+    writeOutfile(conjunctionData, OUTFILE)
     print('Done!')
 
 

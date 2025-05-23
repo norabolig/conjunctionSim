@@ -12,12 +12,12 @@ REarth = 6378.135e3
 
 # Data Structures
 satSpec = (
-    ('names', nb.from_dtype(np.dtype('U20'))[:]),   # Name
+    ('names', nb.from_dtype(np.dtype('U30'))[:]),   # Name
     ('a', nb.float64[:]),                           # Semi-major axis
     ('ma', nb.float64[:]),                          # Mean anomaly
     ('omega', nb.float64[:]),                       # Angular velocity
-    ('Omega', nb.float64[:]),
-    ('Omega_dot', nb.float64[:]),                   # Precession rate
+    ('Omega', nb.float64[:]),                       # Node angle
+    ('Omega_dot', nb.float64[:]),                   # Nodal precession rate
     ('n', nb.float64[:]),                           # Inverse period
     ('e', nb.float64[:]),                           # Eccentricity
     ('I', nb.float64[:]),                           # Inclination
@@ -32,6 +32,25 @@ conjEvent = namedtuple('conjunctionEvent', ['t', 'dist', 'vel', 'alt', 'id1', 'i
 
 @jitclass(satSpec)
 class satArray(object):
+    """
+    Class to hold an array of satellite objects with methods to propagate them along a Keplerian orbit and extract conjunction data.
+
+    Attributes:
+        names (str array): Names of all satellite objects
+        a (array): Semi-major axes
+        ma (array): Mean anomalies
+        omega (array): Angular velocities
+        Omega (array): Node angles
+        Omega_dot (array): Nodal precession rates
+        n (array): Rate of sweep (mean angular motion)
+        e (array): Eccentricities
+        I (array): Orbital inclination angles
+        pos (array): 3D Cartesian position coordinates
+        vel (array): 3D Cartesian velocity components
+        t (float): Current time (calculated as the sum of all timesteps propagated)
+        NSat (int): Total number of satellite objects
+        NConj (int): The total number of conjunctions below a specified distance threshold
+    """
 
     def __init__(self, names: np.ndarray, a: np.ndarray, ma: np.ndarray, omega: np.ndarray, 
                  Omega: np.ndarray, Omega_dot: np.ndarray, n: np.ndarray, e: np.ndarray, I: np.ndarray, pos: np.ndarray, vel: np.ndarray):
@@ -98,16 +117,21 @@ class satArray(object):
         satTwo = self.names[i2]
 
         # Compute relative distances and velocities
-        relD_vec = self.pos[i1] - self.pos[i2]
-        relV_vec = self.vel[i1] - self.vel[i2]
-
-        relD = KT.getNorm(relD_vec)
-        relV = KT.getNorm(relV_vec)
+        relD = KT.getNorm(self.pos[i1] - self.pos[i2])
+        relV = KT.getNorm(self.vel[i1] - self.vel[i2])
 
         # Compute altitudes
         alt = np.sqrt(self.pos[0]**2 + self.pos[1]**2 + self.pos[2]**2) - REarth
         time = [self.t for i in range(len(arr))]
 
         return conjEvent(time, relD, relV, alt, i1, i2, satOne, satTwo)
+    
+    def randomizeOrbits(self) -> None:
+        """
+        Distributes mean anomalies and nodal angles randomly according to a uniform distribution. Simulates behaviour on long timescales.
+        """
+        for i in range(self.NSat):
+            self.ma[i]    = np.random.uniform(0, tau - 1e-8) # Subtract a little bit to avoid overlap
+            self.Omega[i] = np.random.uniform(0, tau - 1e-8)
 
     
