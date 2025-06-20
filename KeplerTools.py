@@ -12,14 +12,28 @@ import numba as nb
 
 from numba import njit
 
-twopi=np.pi*2.0
+
+# ==== Science constants ==== #
+twopi = np.pi*2.0
 MEarth = 5.97e24
+REarth = 6378.135e3 # Radius of Earth (m)
+G = 6.6743e-11
+J2 = 1082.64e-6
 
 @njit
 def vrad(f,n,a,ecc): return n*a*ecc*np.sin(f)/np.sqrt(1-ecc**2)
 
 @njit
 def vaz(f,n,a,ecc): return n*a*(1+ecc*np.cos(f))/np.sqrt(1-ecc**2)
+
+@njit(parallel=True)
+def vSphere(f: np.ndarray, n: np.ndarray, a: np.ndarray, ecc: np.ndarray) -> tuple:
+   const = n*a/np.sqrt(1 - ecc**2)
+
+   vr = const*ecc*np.sin(f)
+   va = const*(1+ecc*np.cos(f))
+
+   return vr, va
 
 @njit
 def radial(f,a,e): return a*(1-e**2)/(1+e*np.cos(f))
@@ -87,7 +101,7 @@ def trueAnomHyper(ecc,EA):
   if f<0: f+=twopi
   return f
 
-@njit(nb.float64[:, :, :](nb.float64[:], nb.float64[:], nb.float64[:]))
+@njit(nb.float64[:, :, :](nb.float64[:], nb.float64[:], nb.float64[:]), parallel=True)
 def get_Qs(w, O, inc) -> np.ndarray:
     
     Qs = np.zeros((len(w), 3, 2))
@@ -105,26 +119,25 @@ def get_Qs(w, O, inc) -> np.ndarray:
 
     return Qs
 
-@njit
-def getXYZVVV(nu, a, w0, ecc, O, inc, n, m0=MEarth, m1=0., G=6.6743e-11):
+@njit(parallel=True)
+def getXYZVVV(nu, a, w0, ecc, O, inc, n, m0: float = MEarth, m1: float = 0., G: float = 6.6743e-11) -> tuple:
     r = radial(nu,a,ecc)
     Q = get_Qs(w0,O,inc)
 
     cosNu, sinNu = np.cos(nu), np.sin(nu)
 
     pos = np.column_stack((r*cosNu*Q[:, 0, 0]+r*sinNu*Q[:, 0, 1], 
-                    r*cosNu*Q[:, 1, 0]+r*sinNu*Q[:, 1, 1], 
-                    r*cosNu*Q[:, 2, 0]+r*sinNu*Q[:, 2, 1]))
+                           r*cosNu*Q[:, 1, 0]+r*sinNu*Q[:, 1, 1], 
+                           r*cosNu*Q[:, 2, 0]+r*sinNu*Q[:, 2, 1]))
 
-    vr = vrad(nu,n,a,ecc)
-    vf = vaz(nu,n,a,ecc)
+    vr, vf = vSphere(nu,n,a,ecc)
 
     VXss=vr*cosNu-vf*sinNu
     VYss=vr*sinNu+vf*cosNu
 
     vel = np.column_stack((VXss*Q[:, 0, 0]+VYss*Q[:, 0, 1],
-                    VXss*Q[:, 1, 0]+VYss*Q[:, 1, 1],
-                    VXss*Q[:, 2, 0]+VYss*Q[:, 2, 1]))
+                           VXss*Q[:, 1, 0]+VYss*Q[:, 1, 1],
+                           VXss*Q[:, 2, 0]+VYss*Q[:, 2, 1]))
 
     return pos, vel
 
@@ -175,7 +188,18 @@ def getNorm(arr: np.ndarray) -> np.ndarray:
     norms[i] = np.sqrt(arr[i, 0]*arr[i, 0] + arr[i, 1]*arr[i, 1] + arr[i, 2]*arr[i, 2])
   return norms
 
+@njit
+def meanAngularMotion(a: float) -> float: return np.sqrt(G*MEarth/a**3)
 
+@njit
+def getPrecessionRate(a: float, e: float, n: float, i: float) -> tuple:
+   """
+   Calculates the apsidal and nodal precession rates of satellites, returned as a tuple.s
+   """
+   const = J2 * n * (REarth)**2/(a*(1 - e**2))**2 # Common factor
+   omegaDot = 0.75 * const * (5*np.cos(i)**2 - 1) # Apsidal precession
+   OmegaDot = -1.5 * const * np.cos(i)            # Nodal precession
+   return omegaDot, OmegaDot
 
 
 

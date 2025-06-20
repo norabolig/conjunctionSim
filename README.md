@@ -39,8 +39,12 @@ By default the outfile name is `track_out_` + OUT_SUFFIX + `.dat`, written to th
 
 In approximately decreasing priority,
 
-- Do run, count all instances of close approaches under 1km, 2km, 4km, 8km, etc... (up to 15km)
-- Implement mode to calculate how long until first <200m close approach
+- ~~Do run, count all instances of close approaches under 1km, 2km, 4km, 8km, etc... (up to 15km)~~
+- ~~Implement mode to calculate how long until first <200m close approach~~
+
+- Make plots of orbital elements for debris / full-catalogue / starlinks
+- ~~Implement apsidal precession~~
+- Implement check-pointing system
 
 1. ~~Implement distance more efficient nearest-neighbour search - SciPy KDTree should be O(n log n) instead of O(n^2).~~
 2. ~~Vectorize KeplerTools~~
@@ -62,3 +66,4 @@ In approximately decreasing priority,
 - 23/03/25: Implemented phase-space mixing. Fixed bug in outfiles.
 - 26/03/25: Performed 48 hour test run, dt = 0.05s w/ 15km threshold.
 - 02/04/25: Cleaned up some memory management.
+- 18/06/25: Implemented apsidal precession

@@ -19,9 +19,9 @@ from satArr import satArray
 
 # Select TLE Catalogue
 # Also set epoch information for TLEs
-TLES_FILENAME = "./in/starlink_07OCT2024.tles"
-# TLES_FILENAME = "./in/full_cat.tles"
-OUT_SUFFIX = 'random_orbit_test'
+TLES_FILENAME = "./in/full_cat_linked.tles"
+# TLES_FILENAME = "./in/full_cat_linked.tles"
+OUT_SUFFIX = 'dev_test'
 JD = 2460591.5
 FR = 0.0
 JDOFFSET = 100
@@ -31,7 +31,7 @@ EPOCHLIM = 24280
 ECCSCALE = 0.0002         # Make eccentric enough to fill shells for any artificial systems
 SMASCALE = 1000           # km to metres
 DT = 0.05                 # Time step in seconds
-TTIME = 120           # How long to run sim (s)
+TTIME = 30           # How long to run sim (s)
 NTIME = int(TTIME / DT)   # Number of steps
 
 EXAMINE_PHS = False                   # Flag to determine if we examine phase-space mixing and produce histograms
@@ -39,11 +39,11 @@ PHS_INT_S = 3600                      # How many seconds to wait between calcula
 PHS_INT = int(PHS_INT_S / DT)        # and how many time steps.
 PHS_FRAMES = int(NTIME / PHS_INT)    # How many frames of our phase space plot we'll have.
 
-DCLOSE_METRE = 15000.        # track if closer than this
+DCLOSE_METRE = 10000.        # track if closer than this
 
 PLOT = False           # If we want to create the plots directly in satEvol
-RANDOM_ORBITS = True   # Randomizes nodes and mean anomalies before running
-LINK = True           # Links objects that are close together before running
+RANDOM_ORBITS = False   # Randomizes nodes and mean anomalies before running
+LINK = True          # Links objects that are close together before running
 
 twopi = np.pi*2             # How many pi??
 MEarth = 5.97e24            # Mass of Earth (kg)
@@ -88,17 +88,18 @@ def readTLEs(TLE_path: str, PHASE_path: str, check_linked: bool = True) -> tuple
         lines = f.readlines()
         TotalSat = int(len(lines)/3) # Total number of satellites, assuming three lines per
 
-        names = np.zeros(TotalSat, dtype='U30')
-        a = np.zeros(TotalSat, dtype='f8')
-        ma = np.zeros(TotalSat, dtype='f8')
-        omega = np.zeros(TotalSat, dtype='f8')
-        Omega = np.zeros(TotalSat, dtype='f8')
-        Omega_dot = np.zeros(TotalSat, dtype='f8')
-        n = np.zeros(TotalSat, dtype='f8')
-        ecc = np.zeros(TotalSat, dtype='f8')
-        inc = np.zeros(TotalSat, dtype='f8')
-        pos = np.zeros(TotalSat, dtype=('f8', 3))
-        vel = np.zeros(TotalSat, dtype=('f8', 3))
+        names       = np.zeros(TotalSat, dtype='U30')
+        a           = np.zeros(TotalSat, dtype='f8')
+        ma          = np.zeros(TotalSat, dtype='f8')
+        omega       = np.zeros(TotalSat, dtype='f8')
+        omega_dot   = np.zeros(TotalSat, dtype='f8')
+        Omega       = np.zeros(TotalSat, dtype='f8')
+        Omega_dot   = np.zeros(TotalSat, dtype='f8')
+        n           = np.zeros(TotalSat, dtype='f8')
+        ecc         = np.zeros(TotalSat, dtype='f8')
+        inc         = np.zeros(TotalSat, dtype='f8')
+        pos         = np.zeros(TotalSat, dtype=('f8', 3))
+        vel         = np.zeros(TotalSat, dtype=('f8', 3))
 
         satIndex = 0
         for i, line in enumerate(lines):
@@ -123,8 +124,8 @@ def readTLEs(TLE_path: str, PHASE_path: str, check_linked: bool = True) -> tuple
                 sat_a, sat_ecc, sat_omega, sat_inc, sat_Omega, sat_nu = KT.getORBELM(sat_pos, sat_vel, muE)
 
                 sat_ma = KT.meanAnom(sat_ecc, sat_nu)  # Mean anomaly
-                sat_n = np.sqrt(G*MEarth/sat_a**3) # Mean angular motion
-                sat_Omega_dot = -1.5*(REarth)**2 / (sat_a*(1 - sat_ecc**2))**2 * J2 * sat_n * np.cos(sat_inc) # Precession rate
+                sat_n = KT.meanAngularMotion(sat_a) # Mean angular motion
+                sat_omega_dot, sat_Omega_dot = KT.getPrecessionRate(sat_a, sat_ecc, sat_n, sat_inc)
 
                 if sat_a*(1 - sat_ecc) < P_THRESH:
 
@@ -132,6 +133,7 @@ def readTLEs(TLE_path: str, PHASE_path: str, check_linked: bool = True) -> tuple
                     a[satIndex]         = sat_a
                     ma[satIndex]        = sat_ma
                     omega[satIndex]     = sat_omega
+                    omega_dot[satIndex] = sat_omega_dot
                     Omega[satIndex]     = sat_Omega
                     Omega_dot[satIndex] = sat_Omega_dot
                     n[satIndex]         = sat_n
@@ -143,14 +145,16 @@ def readTLEs(TLE_path: str, PHASE_path: str, check_linked: bool = True) -> tuple
                     woh.write("{},{},{},{},{},{},{}\n".format(sname, r_km[0], r_km[1], r_km[2], v_km[0], v_km[1], v_km[2]))
                     satIndex += 1
 
+    woh.close()
+
     if check_linked:
         print('Checking for linked objects...')
 
         woh_df = pd.read_csv(PHASE_path, header=None)
         woh_df.columns = ['name','x','y','z','vx','vy','vz']
 
-        woh_df = woh_df[['x', 'y', 'z']].div(10)    # Check ~50m around stuff
-        woh_df = woh_df[['x', 'y', 'z']].round(0)   # This is a jank solution I need to clean up
+        # TODO: Pick-up here
+        woh_df = woh_df[['x', 'y', 'z']].round(1)   # This is a jank solution I need to clean up
 
         woh_keep = woh_df.drop_duplicates(['x','y','z'], keep='first').index.to_numpy()
 
@@ -158,6 +162,7 @@ def readTLEs(TLE_path: str, PHASE_path: str, check_linked: bool = True) -> tuple
         a           = a[woh_keep]
         ma          = ma[woh_keep]
         omega       = omega[woh_keep]
+        omega_dot   = omega_dot[woh_keep]
         Omega       = Omega[woh_keep]
         Omega_dot   = Omega_dot[woh_keep]
         n           = n[woh_keep]
@@ -167,10 +172,8 @@ def readTLEs(TLE_path: str, PHASE_path: str, check_linked: bool = True) -> tuple
         vel         = vel[woh_keep]
 
         print(f'No. of satellites linked: {TotalSat - len(woh_keep)}')
-        
-    woh.close()
 
-    return names, a, ma, omega, Omega, Omega_dot, n, ecc, inc, pos, vel
+    return names, a, ma, omega, omega_dot, Omega, Omega_dot, n, ecc, inc, pos, vel
 
 def writeOutfile(conjList: tuple, fname: str, type='close-approach') -> None:
     """
@@ -197,7 +200,7 @@ def threshQuery(pos: np.ndarray, d: float, pairwise: bool = True):
     Returns:
         array: An array containing arrays with pairs of indices corresponding to satellites below the distance threshold.
     """
-    posTree = KDTree(pos)
+    posTree = KDTree(pos, leafsize=15)
     if pairwise: return posTree.query_pairs(d, output_type='ndarray')
     else: return posTree.query_ball_tree(posTree, d)
 
@@ -206,8 +209,8 @@ def threshQuery(pos: np.ndarray, d: float, pairwise: bool = True):
 def main() -> None:
 
     # Nerd stuff
-    F_CHUNK = int(1e4)        # How many time steps we wait between dumping to outfile
-    NEWFILE_CHUNK = int(1e6)  # How many time steps we wait before starting a new output file
+    F_CHUNK = int(1e1)        # How many time steps we wait between dumping to outfile
+    NEWFILE_CHUNK = int(1e5)  # How many time steps we wait before starting a new output file
     NEWFILE_INDEX = 1         # Output file indexing
 
     PHASE_FOUT = f"./out/catdata_xyzvxvyvz_{OUT_SUFFIX}.dat"
@@ -218,7 +221,7 @@ def main() -> None:
     satData = readTLEs(TLES_FILENAME, PHASE_FOUT, check_linked=LINK)
 
     Satellites = satArray(satData[0], satData[1], satData[2], satData[3], satData[4], satData[5],
-                          satData[6], satData[7], satData[8], satData[9], satData[10])  # For some reason this doesn't construct if I just pass the tuple in
+                          satData[6], satData[7], satData[8], satData[9], satData[10], satData[11])  # For some reason this doesn't construct if I just pass the tuple in
     
     print(f'Total no. of satellites: {Satellites.NSat}')
 
@@ -240,15 +243,17 @@ def main() -> None:
         closeIndices = threshQuery(Satellites.pos, DCLOSE_METRE, pairwise=True)
         conjunctionData.append(Satellites.getConjunctionData(closeIndices))
 
+        # Dump to outfile
         if (itime + 1) % F_CHUNK == 0: 
             writeOutfile(conjunctionData, OUTFILE)
             conjunctionData.clear()
 
+        # Tick up the outfile index
         if (itime + 1) % NEWFILE_CHUNK == 0:
             OUTFILE = f"./out/track_out_{OUT_SUFFIX}_{NEWFILE_INDEX}.dat"
             NEWFILE_INDEX += 1
 
-        print(f'Time: {str(simTime)[0:6]}s  |  No. of conjunctions: {Satellites.NConj}', end='\r')
+        print(f'Time: {simTime:.3f}s  |  No. of conjunctions: {Satellites.NConj}', end='\r')
         simTime += DT
 
     writeOutfile(conjunctionData, OUTFILE)
