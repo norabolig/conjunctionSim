@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import sgp4.api as sgp4
 import csv
+import datetime
 
 from scipy.spatial import KDTree
 
@@ -22,6 +23,7 @@ from satArr import satArray
 TLES_FILENAME = "./in/full_cat_linked.tles"
 # TLES_FILENAME = "./in/full_cat_linked.tles"
 OUT_SUFFIX = 'dev_test'
+CHECKPOINT_FILENAME = f'./out/checkpoint_{OUT_SUFFIX}.dat'
 JD = 2460591.5
 FR = 0.0
 JDOFFSET = 100
@@ -150,11 +152,10 @@ def readTLEs(TLE_path: str, PHASE_path: str, check_linked: bool = True) -> tuple
     if check_linked:
         print('Checking for linked objects...')
 
-        woh_df = pd.read_csv(PHASE_path, header=None)
+        woh_df = pd.read_csv(PHASE_path, header=None, encoding='us-ascii')
         woh_df.columns = ['name','x','y','z','vx','vy','vz']
 
-        # TODO: Pick-up here
-        woh_df = woh_df[['x', 'y', 'z']].round(1)   # This is a jank solution I need to clean up
+        woh_df = woh_df[['x', 'y', 'z']].round(2)   # This is a jank solution I need to clean up
 
         woh_keep = woh_df.drop_duplicates(['x','y','z'], keep='first').index.to_numpy()
 
@@ -185,6 +186,18 @@ def writeOutfile(conjList: tuple, fname: str, type='close-approach') -> None:
             writer = csv.writer(f, delimiter=',')
             writer.writerows(zip(conj['t'], conj['dist'], conj['vel'], conj['alt'],
                                  conj['id1'], conj['id2'], conj['name1'], conj['name2']))
+            
+def createCheckpoint(sat: satArray, fname: str) -> None:
+    """
+    Writes the orbital elements of all satellites at the current time-step to a checkpoint file.
+    """
+    with open(fname, 'w', newline='') as f:
+        f.write(f'## Checkpoint created for run {OUT_SUFFIX} at t = {sat.t} on {datetime.datetime.now()} \n')
+        f.write('## Name, semi-major axis, mean anom., arg. of peri., apsidal precession, RAAN, nodal precession, mean ang. motion, ecc., inc. \n')
+
+        writer = csv.writer(f, delimiter=',')
+        writer.writerows(zip(sat.names, sat.a, sat.ma, sat.omega, sat.omega_dot, sat.Omega, 
+                             sat.Omega_dot, sat.n, sat.e, sat.I))
 
         
 # Distance searching function (can't be jitted because of SciPy)
@@ -252,6 +265,9 @@ def main() -> None:
         if (itime + 1) % NEWFILE_CHUNK == 0:
             OUTFILE = f"./out/track_out_{OUT_SUFFIX}_{NEWFILE_INDEX}.dat"
             NEWFILE_INDEX += 1
+
+        if (itime*DT) % 3600 == 0:
+            createCheckpoint(Satellites, CHECKPOINT_FILENAME)
 
         print(f'Time: {simTime:.3f}s  |  No. of conjunctions: {Satellites.NConj}', end='\r')
         simTime += DT

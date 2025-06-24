@@ -1,9 +1,11 @@
 # SatEvol
-## Satellite Cloud Evolution and Close Approach Tracking
+## Satellite Array Evolution and Close Approach Tracking
 
-This code reads satellite TLEs and propagates those objects on orbit around the Earth using the SGP4 model to a common epoch. At each time-step all satellites are checked for close approaches with other satellites and logged.
+SatEvol is a program that propagates a satellite population in low-Earth orbit (LEO) while tracking conjunctions. Input is provided as a list of Two/Three-Line Element sets (TLEs) from which orbital elements are extracted and used to construct a Keplerian orbit for each satellite, with perturbations from apsidal and nodal precession taken into account. At each time-step any conjuncting objects closer than a threshold distance are logged and saved to a data file (format described below).
 
-## How to run:
+Plotting scripts are included to visualize the results, including conjunction tracks, relative distance and velocity histograms, time between conjunctions as a function of altitude, and a count of conjunctions over time. The simulation differentiates between satellites, debris, and derelict rocket bodies.
+
+## Usage
 
 There are a handful of parameters at the beginning of `satEvol.py` to be configured:
 
@@ -13,10 +15,6 @@ There are a handful of parameters at the beginning of `satEvol.py` to be configu
 `PHASE_FOUT [str]`:       Name for outfile containing initial phase-space configuration (i.e. positions and velocities for every satellite at t=0)
 
 `OUT_SUFFIX [str]`:       String appended to all outfiles for a given run
-
-`EXAMINE_PHS [bool]`:     Whether or not examine phase-space mixing with snapshots
-
-`PLOT [bool]`:            Wether or not to create plots directly with satEvol.  
 
 `DT [float]`:             Length of time-step [s]
 
@@ -35,6 +33,12 @@ By default the outfile name is `track_out_` + OUT_SUFFIX + `.dat`, written to th
 
 `[Time], [Conjunction distance], [Relative velocity], [Altitude], [Index of 1st satellite], [Index of 2nd satellite], [Name of 1st satellite], [Name of 2nd satellite]`
 
+## Planned Features
+
+- System to handle collisions and inject debris into the simulation.
+- Wider range of perturbative effects (for long time-scale runs)
+- Move number crunching to a compiled language or the GPU.
+
 ## To-do List:
 
 In approximately decreasing priority,
@@ -51,12 +55,6 @@ In approximately decreasing priority,
 3. ~~Implement numba (JIT compilation)~~ and (probably) parallelize
 4. Re-evaluate performance and decide if it needs to be translated
 5. Remove plotting and create a helper program to take care of it afterwards for deployment
-
-## Plots and Quantities Needed:
-
-1. Phase-space mixing histogram for starlink constellation. Sampled ~hourly. 2D histogram?
-2. Time scale for close encounters as a function of altitude.
-3. (Maybe) Object threshold for avoidance maneuver cascade
 
 ## Changelog:
 
