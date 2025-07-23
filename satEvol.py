@@ -20,11 +20,11 @@ from satArr import satArray
 
 # Select TLE Catalogue
 # Also set epoch information for TLEs
-TLES_FILENAME = "./in/full_cat_linked.tles"
-# TLES_FILENAME = "./in/full_cat_linked.tles"
-OUT_SUFFIX = 'dev_test'
+# TLES_FILENAME = "./in/25Jun2025_tles.dat"
+TLES_FILENAME = "./out/checkpoint_2025_collision_100m_dt_0p001.dat"
+OUT_SUFFIX = 'checkpoint_read_test'
 CHECKPOINT_FILENAME = f'./out/checkpoint_{OUT_SUFFIX}.dat'
-JD = 2460591.5
+JD = 2460851.5
 FR = 0.0
 JDOFFSET = 100
 EPOCHLIM = 24280
@@ -32,8 +32,8 @@ EPOCHLIM = 24280
 # Constants and parameters
 ECCSCALE = 0.0002         # Make eccentric enough to fill shells for any artificial systems
 SMASCALE = 1000           # km to metres
-DT = 0.05                 # Time step in seconds
-TTIME = 30           # How long to run sim (s)
+DT = 0.001                 # Time step in seconds
+TTIME = 20           # How long to run sim (s)
 NTIME = int(TTIME / DT)   # Number of steps
 
 EXAMINE_PHS = False                   # Flag to determine if we examine phase-space mixing and produce histograms
@@ -41,11 +41,12 @@ PHS_INT_S = 3600                      # How many seconds to wait between calcula
 PHS_INT = int(PHS_INT_S / DT)        # and how many time steps.
 PHS_FRAMES = int(NTIME / PHS_INT)    # How many frames of our phase space plot we'll have.
 
-DCLOSE_METRE = 10000.        # track if closer than this
+DCLOSE_METRE = 100.        # track if closer than this
 
 PLOT = False           # If we want to create the plots directly in satEvol
 RANDOM_ORBITS = False   # Randomizes nodes and mean anomalies before running
 LINK = True          # Links objects that are close together before running
+READ_FROM_CHECKPOINT = True     # If we want to read from a checkpoint file instead of a list of TLEs
 
 twopi = np.pi*2             # How many pi??
 MEarth = 5.97e24            # Mass of Earth (kg)
@@ -155,7 +156,7 @@ def readTLEs(TLE_path: str, PHASE_path: str, check_linked: bool = True) -> tuple
         woh_df = pd.read_csv(PHASE_path, header=None, encoding='us-ascii')
         woh_df.columns = ['name','x','y','z','vx','vy','vz']
 
-        woh_df = woh_df[['x', 'y', 'z']].round(2)   # This is a jank solution I need to clean up
+        woh_df = woh_df[['x', 'y', 'z']].round(1)   # This is a jank solution I need to clean up
 
         woh_keep = woh_df.drop_duplicates(['x','y','z'], keep='first').index.to_numpy()
 
@@ -175,6 +176,35 @@ def readTLEs(TLE_path: str, PHASE_path: str, check_linked: bool = True) -> tuple
         print(f'No. of satellites linked: {TotalSat - len(woh_keep)}')
 
     return names, a, ma, omega, omega_dot, Omega, Omega_dot, n, ecc, inc, pos, vel
+
+def readCheckpoint(fname: str) -> tuple:
+    """
+    Reads from a checkpoint file (list of names and orbital elements)
+    """
+    with open(fname, 'r') as f:
+        lines = f.readlines()
+
+        header = lines[0].split()
+        time = float(header[header.index('t') + 2])
+
+        lines = lines[2:]
+        totalSat = len(lines)
+
+        names       = np.asarray([line.split(',')[0] for line in lines], dtype='U30')
+        a           = np.asarray([line.split(',')[1] for line in lines], dtype='f8')
+        ma          = np.asarray([line.split(',')[2] for line in lines], dtype='f8')
+        omega       = np.asarray([line.split(',')[3] for line in lines], dtype='f8')
+        omega_dot   = np.asarray([line.split(',')[4] for line in lines], dtype='f8')
+        Omega       = np.asarray([line.split(',')[5] for line in lines], dtype='f8')
+        Omega_dot   = np.asarray([line.split(',')[6] for line in lines], dtype='f8')
+        n           = np.asarray([line.split(',')[7] for line in lines], dtype='f8')
+        ecc         = np.asarray([line.split(',')[8] for line in lines], dtype='f8')
+        inc         = np.asarray([line.split(',')[9] for line in lines], dtype='f8')
+        pos         = np.zeros(totalSat, dtype=('f8', 3))
+        vel         = np.zeros(totalSat, dtype=('f8', 3))
+        
+
+    return names, a, ma, omega, omega_dot, Omega, Omega_dot, n, ecc, inc, pos, vel, time
 
 def writeOutfile(conjList: tuple, fname: str, type='close-approach') -> None:
     """
@@ -223,19 +253,28 @@ def main() -> None:
 
     # Nerd stuff
     F_CHUNK = int(1e1)        # How many time steps we wait between dumping to outfile
-    NEWFILE_CHUNK = int(1e5)  # How many time steps we wait before starting a new output file
+    NEWFILE_CHUNK = int(3.6e6)  # How many time steps we wait before starting a new output file
     NEWFILE_INDEX = 1         # Output file indexing
 
     PHASE_FOUT = f"./out/catdata_xyzvxvyvz_{OUT_SUFFIX}.dat"
     OUTFILE = f"./out/track_out_{OUT_SUFFIX}.dat"
 
     # Read in TLEs
-    print('Reading TLEs...')
-    satData = readTLEs(TLES_FILENAME, PHASE_FOUT, check_linked=LINK)
+    if READ_FROM_CHECKPOINT:
+        print('Reading checkpoint...')
+        satData = readCheckpoint(TLES_FILENAME)
+        Satellites = satArray(satData[0], satData[1], satData[2], satData[3], satData[4], satData[5],
+                              satData[6], satData[7], satData[8], satData[9], satData[10], satData[11])
+        
+        Satellites.t = satData[12]
 
-    Satellites = satArray(satData[0], satData[1], satData[2], satData[3], satData[4], satData[5],
-                          satData[6], satData[7], satData[8], satData[9], satData[10], satData[11])  # For some reason this doesn't construct if I just pass the tuple in
-    
+    else: 
+        print('Reading TLEs...')
+        satData = readTLEs(TLES_FILENAME, PHASE_FOUT, check_linked=LINK)
+
+        Satellites = satArray(satData[0], satData[1], satData[2], satData[3], satData[4], satData[5],
+                              satData[6], satData[7], satData[8], satData[9], satData[10], satData[11])  # For some reason this doesn't construct if I just pass the tuple in
+        
     print(f'Total no. of satellites: {Satellites.NSat}')
 
     # Initialize satellite positions
@@ -245,7 +284,7 @@ def main() -> None:
 
     Satellites.updateKinematics()
 
-    simTime = 0
+    simTime = Satellites.t
     conjunctionData = []
     
     # Main integration
@@ -266,7 +305,7 @@ def main() -> None:
             OUTFILE = f"./out/track_out_{OUT_SUFFIX}_{NEWFILE_INDEX}.dat"
             NEWFILE_INDEX += 1
 
-        if (itime*DT) % 3600 == 0:
+        if (itime*DT) % 1800 == 0:
             createCheckpoint(Satellites, CHECKPOINT_FILENAME)
 
         print(f'Time: {simTime:.3f}s  |  No. of conjunctions: {Satellites.NConj}', end='\r')
