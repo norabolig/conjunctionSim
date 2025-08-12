@@ -128,7 +128,7 @@ NSAT=len(sat_a)
 sat_n = np.sqrt(G*MEarth/sat_a**3)
 
 # set precession rate
-Omega_dot = -1.5* (REarth)**2/(sat_a*(1-sat_e))**2*J2*sat_n*np.cos(sat_I)
+Omega_dot = -1.5* (REarth)**2/(sat_a*(1-sat_e)**2)**2*J2*sat_n*np.cos(sat_I)
 
 # sanity check
 print("Total sats: {}".format(NSAT))
@@ -326,3 +326,4 @@ else:
         plt.savefig("./out/sats_65k_mollweide_lineonly" + OUT_SUFFIX + ".pdf")
 
 print('Done!')
+
