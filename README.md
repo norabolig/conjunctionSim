@@ -1,67 +1,73 @@
 # SatEvol
 ## Satellite Array Evolution and Close Approach Tracking
 
-SatEvol is a program that propagates a satellite population in low-Earth orbit (LEO) while tracking conjunctions. Input is provided as a list of Two/Three-Line Element sets (TLEs) from which orbital elements are extracted and used to construct a Keplerian orbit for each satellite, with perturbations from apsidal and nodal precession taken into account. At each time-step any conjuncting objects closer than a threshold distance are logged and saved to a data file (format described below).
+SatEvol is a program that propagates a satellite population in low-Earth orbit (LEO) while tracking conjunctions. Input is provided as a list of Three-Line Element sets (TLEs) from which orbital elements are extracted and used to construct a Keplerian orbit for each satellite, with perturbations from Earth's oblateness taken into account (the J2 zonal coefficient). At each time-step, any objects closer than some threshold distance are logged and saved to a data file (format described below).
 
 Plotting scripts are included to visualize the results, including conjunction tracks, relative distance and velocity histograms, time between conjunctions as a function of altitude, and a count of conjunctions over time. The simulation differentiates between satellites, debris, and derelict rocket bodies.
 
+This code was produced primarily to verify close-encounter rates with the more heuristic [CRASH Clock](https://outerspaceinstitute.ca/crashclock/), a metric intended to provide the average time to first collision in the absence of any stationkeeping or collision avoidance maneuvers.
+
 ## Usage
 
-There are a handful of parameters at the beginning of `satEvol.py` to be configured:
+There are a handful of parameters/flags at the beginning of `satEvol.py` to be configured:
 
-
-`TLES_FILENAME [str]`:    Path to file containing list of TLEs to be read in
-
-`PHASE_FOUT [str]`:       Name for outfile containing initial phase-space configuration (i.e. positions and velocities for every satellite at t=0)
+`TLES_FILENAME [str]`:    Path to file containing list of TLEs to be read in, **or** or a checkpoint file from a previous simulation run (described below)
 
 `OUT_SUFFIX [str]`:       String appended to all outfiles for a given run
 
-`DT [float]`:             Length of time-step [s]
+`JD [float]`:             Julian date to propagate all satellites to before beginning the main integration. If any TLEs are provided with a date that differs from `JD` by more than `JDOFFSET [float]`, they will be omitted from the calculation.
+
+`DT [float]`:             Length of time-step [s] (Satellites in LEO travel around 7-10 km/s, so a small timestep is important for cataloguing very close encounters)
 
 `TTIME [float]`:          Total time of sim run [s]
 
-`PHS_INT_S [float]`:      How long to wait between phase-space snapshots if `EXAMINE_PHS=True`
-
 `DCLOSE_METRE [float]`:   Minimum distance to catalogue a close encounter [m]
+
+`READ_FROM_CHECKPOINT [bool]`:  Whether or not to read from a checkpoint file (True) or a list of TLEs (False)
+
+`LINK [bool]`:  If true and reading from a list of TLEs, the code will attempt to find objects initialized within a small distance of each other (~100 m) and consolidate them into a single object. This is intended to handle modular spacecraft with multiple components that have different TLEs (e.g. the ISS), and uninitialized TLEs (which usually initialize at the origin).
+
+`RANDOM_ORBITS [bool]`: If true, the RAAN, mean anomaly, and argument of periapsis (at epoch) for each object is randomized according to a uniform distribution between 0 and 2π before propagating. This is intended to simulate randomization of the orbital environment on long time-scales.
+
+---
 
 Once configured, the code can be run with
 
 > `python3 satEvol.py`
 
-While running the program displays the current time-step and the number of satellites that currently fall within `DCLOSE_METRE` distance of eachother. 
+While running the program displays the current simulation time and the number of satellites that currently fall within `DCLOSE_METRE` distance of eachother.
+
+## Output
+
 By default the outfile name is `track_out_` + OUT_SUFFIX + `.dat`, written to the `out` directory. The columns are:
 
-`[Time], [Conjunction distance], [Relative velocity], [Altitude], [Index of 1st satellite], [Index of 2nd satellite], [Name of 1st satellite], [Name of 2nd satellite]`
+`Time [s], Conjunction distance [m], Relative velocity [m/s], Altitude [m], Index of 1st satellite, Index of 2nd satellite, Name of 1st satellite, Name of 2nd satellite`
 
-## Planned Features
+The helper script `plot_tracks.py` can be used to visualize the results. Simulation parameters need to be copied over to the relevant global variables before running. The script produces a plot of:
 
-- System to handle collisions and inject debris into the simulation.
-- Wider range of perturbative effects (for long time-scale runs)
-- Move number crunching to a compiled language or the GPU.
+- Fitted conjunction distances over time ("tracks") for all orbiting objects
+- 2D histogram of the minimum close approach distances and relative velocities for all objects
+- 1D histogram of the relative velocities between all conjuncting objects
+- 2D histogram of the time between conjunctions and the altitudes of all conjuncting objects
+- Time series of conjunction frequency between the different object populations
+- Frequency of close encounters as a function of altitude
 
-## To-do List:
+## Dependencies
 
-In approximately decreasing priority,
+- NumPy v2.26+
+- Pandas v2.3.1+
+- SciPy v1.15.3+
+- Numba v0.61.2 (Numba is still in active development, higher versions may or may not introduce issues)
+- Python implementation of [SGP4 v2.24+](https://pypi.org/project/sgp4/)
+- Matplotlib (for visualizing output)
 
-- ~~Do run, count all instances of close approaches under 1km, 2km, 4km, 8km, etc... (up to 15km)~~
-- ~~Implement mode to calculate how long until first <200m close approach~~
+`KeplerTools.py` is a helper module containing functions for common astrodynamical calculations. This is where the bulk of the numerical orbital propagation takes place.
 
-- Make plots of orbital elements for debris / full-catalogue / starlinks
-- ~~Implement apsidal precession~~
-- Implement check-pointing system
+`satArr.py` contains the class holding the collection of intialized satellites and their orbital elements. The class contains methods for propagating the orbits and figuring out which objects are in conjunction.
 
-1. ~~Implement distance more efficient nearest-neighbour search - SciPy KDTree should be O(n log n) instead of O(n^2).~~
-2. ~~Vectorize KeplerTools~~
-3. ~~Implement numba (JIT compilation)~~ and (probably) parallelize
-4. Re-evaluate performance and decide if it needs to be translated
-5. Remove plotting and create a helper program to take care of it afterwards for deployment
+## Contact and Citation
 
-## Changelog:
+For questions about the code, feel free to reach out to `skyeh@phas.ubc.ca`. 
+If you use any of this code in your own work, or extend it, please cite [this paper](https://www.sciencedirect.com/science/article/pii/S0094576526004091).
 
-- 11/03/25: Implemented KDTree distance search.
-- 12/03/25: Optimized a chunk of KeplerTools, implemented numba for jit compilation.
-- 17/03/25: Minor file I/O clean-up, including outfiles for 4-orbit test run.
-- 23/03/25: Implemented phase-space mixing. Fixed bug in outfiles.
-- 26/03/25: Performed 48 hour test run, dt = 0.05s w/ 15km threshold.
-- 02/04/25: Cleaned up some memory management.
-- 18/06/25: Implemented apsidal precession
+

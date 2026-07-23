@@ -1,3 +1,5 @@
 sim_runs/
 out/*
 analysis/
+./profile.txt
+./NOTES.md

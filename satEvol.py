@@ -20,7 +20,6 @@ from satArr import satArray
 
 # Select TLE Catalogue
 # Also set epoch information for TLEs
-# TLES_FILENAME = "./in/25Jun2025_tles.dat"
 TLES_FILENAME = "./out/checkpoint_2025_collision_100m_dt_0p001.dat"
 OUT_SUFFIX = 'checkpoint_read_test'
 CHECKPOINT_FILENAME = f'./out/checkpoint_{OUT_SUFFIX}.dat'
@@ -36,14 +35,8 @@ DT = 0.001                 # Time step in seconds
 TTIME = 20           # How long to run sim (s)
 NTIME = int(TTIME / DT)   # Number of steps
 
-EXAMINE_PHS = False                   # Flag to determine if we examine phase-space mixing and produce histograms
-PHS_INT_S = 3600                      # How many seconds to wait between calculating phase-space coords,
-PHS_INT = int(PHS_INT_S / DT)        # and how many time steps.
-PHS_FRAMES = int(NTIME / PHS_INT)    # How many frames of our phase space plot we'll have.
-
 DCLOSE_METRE = 100.        # track if closer than this
 
-PLOT = False           # If we want to create the plots directly in satEvol
 RANDOM_ORBITS = False   # Randomizes nodes and mean anomalies before running
 LINK = True          # Links objects that are close together before running
 READ_FROM_CHECKPOINT = True     # If we want to read from a checkpoint file instead of a list of TLEs
