@@ -2,4 +2,5 @@ sim_runs/
 out/*
 analysis/
 ./profile.txt
-./NOTES.md
+NOTES.md
+plot_tracksNEW.py

@@ -35,7 +35,7 @@ Once configured, the code can be run with
 
 > `python3 satEvol.py`
 
-While running the program displays the current simulation time and the number of satellites that currently fall within `DCLOSE_METRE` distance of eachother.
+While running the program displays the current simulation time and the number of satellites that currently fall within `DCLOSE_METRE` distance of eachother. Checkpoint files are periodically saved so that the simulation can be stopped and restarted. To do so, set `READ_FROM_CHEACKPOINT = True` and change the input filename to the most recent checkpoint file.
 
 ## Output
 
